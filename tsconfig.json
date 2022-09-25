@@ -1,0 +1,16 @@
+{
+	"compilerOptions": {
+		"experimentalDecorators": true,
+		"emitDecoratorMetadata": true,
+		"watch": true,
+		"target": "ES6",
+		"moduleResolution": "Node",
+		"allowSyntheticDefaultImports": true,
+		"outDir": "dist/",
+		"baseUrl": "./src",
+		"lib": ["ES2021", "DOM"],
+		"declaration": true,
+		"module": "ES2015",
+	},
+	"include": ["src/"]
+}

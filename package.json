@@ -1,0 +1,21 @@
+{
+  "name": "atherjs",
+  "version": "0.1.0",
+  "description": "A small library to make any Static Site feel like a modern SPA.",
+  "main": "dist/app.js",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/AtherActive-net/AtherJS.git"
+  },
+  "keywords": [],
+  "author": "ATHER",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/AtherActive-net/AtherJS/issues"
+  },
+  "homepage": "https://atherdev.nl/",
+  "module": "dist/app.js",
+  "devDependencies": {
+    "ts-loader": "^9.4.1"
+  }
+}
