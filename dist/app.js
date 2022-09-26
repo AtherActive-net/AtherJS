@@ -7,6 +7,12 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
         step((generator = generator.apply(thisArg, _arguments || [])).next());
     });
 };
+var __classPrivateFieldGet = (this && this.__classPrivateFieldGet) || function (receiver, state, kind, f) {
+    if (kind === "a" && !f) throw new TypeError("Private accessor was defined without a getter");
+    if (typeof state === "function" ? receiver !== state || !f : !state.has(receiver)) throw new TypeError("Cannot read private member from an object whose class did not declare it");
+    return kind === "m" ? f : kind === "a" ? f.call(receiver) : f ? f.value : state.get(receiver);
+};
+var _State_stateObject;
 /**
  * AtherJS base class. Contains all functionality and hooks
  * @param {AtherOptions} options - Options for AtherJS
@@ -55,13 +61,20 @@ class AtherJS {
     configLinks() {
         const links = document.querySelectorAll('a');
         links.forEach((link) => {
-            if (!link.hasAttribute('ather-ignore')) {
-                link.addEventListener('click', (e) => __awaiter(this, void 0, void 0, function* () {
-                    e.preventDefault();
-                    yield this.go(link.href);
-                }));
+            if (this.validateLink(link)) {
+                if (!link.hasAttribute('ather-ignore')) {
+                    link.addEventListener('click', (e) => __awaiter(this, void 0, void 0, function* () {
+                        e.preventDefault();
+                        yield this.go(link.href);
+                    }));
+                    if (this.debugLogging)
+                        log(`🔗 Configured link ${link.href}`);
+                }
+            }
+            else {
                 if (this.debugLogging)
-                    log(`🔗 Configured link ${link.href}`);
+                    log(`❌ Link ${link.href} disabled as it failed validation check.`, 'warn');
+                link.removeAttribute('href');
             }
         });
     }
@@ -77,6 +90,7 @@ class AtherJS {
             const body = yield this.parsePage(yield pageData);
             // Cleanup and render the page
             this.cleanPage(body);
+            this.executeJS(body);
             // update the URL at the top of the browser
             window.history.pushState({}, '', url);
             // We need to fully reload all links as these have not yet been intercepted.
@@ -85,6 +99,8 @@ class AtherJS {
             this.state.reloadState();
             // And in the end we fade in the new page.
             yield this.animator.fadeIn(document.body.querySelector(this.body));
+            document.dispatchEvent(new CustomEvent('atherjs:pagechange'));
+            event;
         });
     }
     /**
@@ -95,7 +111,7 @@ class AtherJS {
     requestPage(url) {
         return __awaiter(this, void 0, void 0, function* () {
             if (this.debugLogging)
-                log(`🔽 Requesting page ${url}`);
+                log(`🌍 Requesting page ${url}`);
             // Time the fetch and display the time in the console if debugLogging is on
             let startTime = new Date();
             let req = yield fetch(url);
@@ -123,6 +139,21 @@ class AtherJS {
             const doc = parser.parseFromString(page, 'text/html');
             const body = doc.body;
             return body;
+        });
+    }
+    /**
+     * Execute all JS in the page. It is embedded in a script tag and executed.
+     * Note: Be careful with your script includes as it will include any script tag found in the body.
+     * @param body - The new page's body to take the scripts from.
+     */
+    executeJS(body) {
+        const scripts = body.querySelectorAll('script');
+        const basePage = document.body.querySelector(this.body);
+        scripts.forEach((script) => {
+            const newScript = document.createElement('script');
+            newScript.innerHTML = script.innerHTML;
+            newScript.src = script.src;
+            basePage.appendChild(newScript);
         });
     }
     /**
@@ -154,6 +185,7 @@ class AtherJS {
      * @param body - Body to replace the current body with
      */
     rebuildBody(body) {
+        document.body.querySelector(this.body).innerHTML = '';
         document.body.querySelector(this.body).replaceWith(body.querySelector(this.body));
     }
     /**
@@ -162,6 +194,16 @@ class AtherJS {
      */
     doesNavigatorExist() {
         return typeof window.navigator !== 'undefined';
+    }
+    /**
+     * CHeck to see if a A tag is actually a Link or just a fancy button.
+     * @param link - Link to check
+     * @returns `bool` Is this link an actual link?
+     */
+    validateLink(link) {
+        if (link.href == window.location.href)
+            return false;
+        return link.href.includes('http');
     }
 }
 /**
@@ -181,7 +223,7 @@ class Anims {
                 // el.style.display = 'block';
                 (function fade() {
                     var val = parseFloat(el.style.opacity);
-                    if (!((val += .04) > 1)) {
+                    if (!((val += .05) > 1)) {
                         el.style.opacity = val.toString();
                         requestAnimationFrame(fade);
                     }
@@ -203,7 +245,7 @@ class Anims {
             return new Promise((resolve, reject) => {
                 el.style.opacity = '1';
                 (function fade() {
-                    if ((parseFloat(el.style.opacity) - 0.04) < 0) {
+                    if ((parseFloat(el.style.opacity) - 0.05) < -0.05) {
                         // el.style.display = 'none';
                         resolve(true);
                     }
@@ -223,7 +265,7 @@ class State {
     constructor() {
         this.debugLogging = true;
         this.createStatesOnPageLoad = true;
-        this.stateObject = {};
+        _State_stateObject.set(this, {});
         this.updateElementListOnUpdate = true;
         if (this.createStatesOnPageLoad) {
             document.addEventListener('DOMContentLoaded', () => {
@@ -237,14 +279,14 @@ class State {
      * @param value - Value to set
      */
     setState(key, value) {
-        if (this.stateObject[key] == undefined) {
+        if (__classPrivateFieldGet(this, _State_stateObject, "f")[key] == undefined) {
             log(`State key '${key}' does not exist. Creating it..`, 'warn');
             log('States should be created manually before setting values.', 'warn');
             this.createState(key, value);
         }
-        this.stateObject[key].value = value;
+        __classPrivateFieldGet(this, _State_stateObject, "f")[key].value = value;
         if (this.updateElementListOnUpdate) {
-            this.stateObject[key].updateElements();
+            __classPrivateFieldGet(this, _State_stateObject, "f")[key].updateElements();
         }
     }
     /**
@@ -253,7 +295,7 @@ class State {
      * @param value - Initial value of the state
      */
     createState(name, value) {
-        this.stateObject[name] = new StateObject(name, value);
+        __classPrivateFieldGet(this, _State_stateObject, "f")[name] = new StateObject(name, value);
     }
     /**
      * Get a value of a state.
@@ -261,30 +303,30 @@ class State {
      * @returns value of the key
      */
     getState(key) {
-        if (this.stateObject[key] == undefined) {
+        if (__classPrivateFieldGet(this, _State_stateObject, "f")[key] == undefined) {
             log(`State '${key}' does not exist. Returning undefined`, 'warn');
             return undefined;
         }
-        return this.stateObject[key].value;
+        return __classPrivateFieldGet(this, _State_stateObject, "f")[key].value;
     }
     /**
      * Delete a State from the Manager. This action is irreversible.
      * @param key - Key to delete
      */
     deleteState(key) {
-        if (this.stateObject[key] == undefined) {
+        if (__classPrivateFieldGet(this, _State_stateObject, "f")[key] == undefined) {
             log(`State '${key}' does not exist. Therefore it cannot be deleted.`, 'warn');
         }
-        delete this.stateObject[key];
+        delete __classPrivateFieldGet(this, _State_stateObject, "f")[key];
     }
     /**
      * Reload all elements that interact with State. Required after changing pages.
      * For changes to the DOM after load, call the `updateElements` function on the StateObject instead.
      */
     reloadState() {
-        for (let key in this.stateObject) {
-            this.stateObject[key].findElements();
-            this.stateObject[key].updateElements();
+        for (let key in __classPrivateFieldGet(this, _State_stateObject, "f")) {
+            __classPrivateFieldGet(this, _State_stateObject, "f")[key].findElements();
+            __classPrivateFieldGet(this, _State_stateObject, "f")[key].updateElements();
             if (this.debugLogging)
                 log(`🔃 Reloaded state '${key}'`, 'log');
         }
@@ -298,14 +340,17 @@ class State {
             return;
         const states = document.querySelectorAll('[ather-state]');
         states.forEach((state) => {
-            if (this.debugLogging)
-                log(`⚙️ Creating state '${state.getAttribute('ather-state')}' from page load.`, 'log');
-            const name = state.getAttribute('ather-state');
-            const value = state.getAttribute('ather-state-inital') || '';
-            this.createState(name, value);
+            if (__classPrivateFieldGet(this, _State_stateObject, "f")[state.getAttribute('ather-state')] == undefined) {
+                if (this.debugLogging)
+                    log(`⚙️ Creating state '${state.getAttribute('ather-state')}' from page load.`, 'log');
+                const name = state.getAttribute('ather-state');
+                const value = state.getAttribute('ather-state-inital') || '';
+                this.createState(name, value);
+            }
         });
     }
 }
+_State_stateObject = new WeakMap();
 /**
  * A State Object is a single state. It contains the value, and a reference to elements that interact with it.
  */

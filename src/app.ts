@@ -92,14 +92,20 @@ class AtherJS {
         const links = document.querySelectorAll('a');
         links.forEach((link) =>{
 
-            if(!link.hasAttribute('ather-ignore')) {
+            if(this.validateLink(link)) {
 
-                link.addEventListener('click', async (e) => {
-                    e.preventDefault();
-                    await this.go(link.href);
-                })
+                if(!link.hasAttribute('ather-ignore')) {
 
-                if(this.debugLogging) log(`🔗 Configured link ${link.href}`)
+                    link.addEventListener('click', async (e) => {
+                        e.preventDefault();
+                        await this.go(link.href);
+                    })
+    
+                    if(this.debugLogging) log(`🔗 Configured link ${link.href}`)
+                }
+            } else {
+                if(this.debugLogging) log(`❌ Link ${link.href} disabled as it failed validation check.`,'warn');
+                link.removeAttribute('href');
             }
         })
     }
@@ -116,6 +122,7 @@ class AtherJS {
         
         // Cleanup and render the page
         this.cleanPage(body);
+        this.executeJS(body);
         // update the URL at the top of the browser
         window.history.pushState({}, '', url);
 
@@ -127,6 +134,9 @@ class AtherJS {
 
         // And in the end we fade in the new page.
         await this.animator.fadeIn(document.body.querySelector(this.body))
+        document.dispatchEvent(new CustomEvent('atherjs:pagechange'))
+        event
+
 
     }
 
@@ -136,7 +146,7 @@ class AtherJS {
      * @returns `string` Returns the page body
      */
     private async requestPage(url:string) {
-        if(this.debugLogging) log(`🔽 Requesting page ${url}`);
+        if(this.debugLogging) log(`🌍 Requesting page ${url}`);
 
         // Time the fetch and display the time in the console if debugLogging is on
         let startTime = new Date()
@@ -171,6 +181,22 @@ class AtherJS {
     }
 
     /**
+     * Execute all JS in the page. It is embedded in a script tag and executed.
+     * Note: Be careful with your script includes as it will include any script tag found in the body.
+     * @param body - The new page's body to take the scripts from.
+     */
+    private executeJS(body:HTMLElement) {
+        const scripts = body.querySelectorAll('script');
+        const basePage = document.body.querySelector(this.body);
+        scripts.forEach((script) => {
+            const newScript = document.createElement('script');
+            newScript.innerHTML = script.innerHTML;
+            newScript.src = script.src;
+            basePage.appendChild(newScript);
+        })
+    }
+
+    /**
      * Clean up and render the page to the hidden body
      * @param page - Page to clean
      * @returns `void`
@@ -201,6 +227,7 @@ class AtherJS {
      * @param body - Body to replace the current body with
      */
     private rebuildBody(body:Element) {
+        document.body.querySelector(this.body).innerHTML = '';
         document.body.querySelector(this.body).replaceWith(body.querySelector(this.body));
     }
 
@@ -211,6 +238,16 @@ class AtherJS {
      */
     private doesNavigatorExist():Boolean {
         return typeof window.navigator !== 'undefined'
+    }
+
+    /**
+     * CHeck to see if a A tag is actually a Link or just a fancy button.
+     * @param link - Link to check
+     * @returns `bool` Is this link an actual link?
+     */
+    private validateLink(link:HTMLAnchorElement) {
+        if(link.href == window.location.href) return false;
+        return link.href.includes('http')
     }
 
 }
@@ -231,7 +268,7 @@ class Anims {
             // el.style.display = 'block';
             (function fade() {
                 var val = parseFloat(el.style.opacity);
-                if (!((val += .04) > 1)) {
+                if (!((val += .05) > 1)) {
                     el.style.opacity = val.toString();
                     requestAnimationFrame(fade);
                 } else {
@@ -251,7 +288,7 @@ class Anims {
         return new Promise((resolve, reject) => {
             el.style.opacity = '1';
             (function fade() {
-                if ((parseFloat(el.style.opacity) - 0.04) < 0) {
+                if ((parseFloat(el.style.opacity) - 0.05) < -0.05) {
                     // el.style.display = 'none';
                     resolve(true)
                 } else {
@@ -270,7 +307,7 @@ class State {
     public debugLogging:boolean = true;
     public createStatesOnPageLoad:boolean = true;
 
-    private stateObject:object = {};
+    #stateObject:object = {};
     private updateElementListOnUpdate:boolean = true;
 
     constructor() {
@@ -287,15 +324,15 @@ class State {
      * @param value - Value to set
      */
     public setState(key:string,value:any) {
-        if(this.stateObject[key] == undefined) {
+        if(this.#stateObject[key] == undefined) {
             log(`State key '${key}' does not exist. Creating it..`, 'warn');
             log('States should be created manually before setting values.', 'warn');
             this.createState(key, value)
         }
-        this.stateObject[key].value = value;
+        this.#stateObject[key].value = value;
 
         if(this.updateElementListOnUpdate) {
-            this.stateObject[key].updateElements();
+            this.#stateObject[key].updateElements();
         }
     }
 
@@ -305,7 +342,7 @@ class State {
      * @param value - Initial value of the state
      */
     public createState(name:string,value:any) {
-        this.stateObject[name] = new StateObject(name,value);
+        this.#stateObject[name] = new StateObject(name,value);
     }
 
     /**
@@ -314,11 +351,11 @@ class State {
      * @returns value of the key
      */
     public getState(key:string) {
-        if(this.stateObject[key] == undefined) {
+        if(this.#stateObject[key] == undefined) {
             log(`State '${key}' does not exist. Returning undefined`, 'warn');
             return undefined;
         }
-        return this.stateObject[key].value;
+        return this.#stateObject[key].value;
     }
 
     /**
@@ -326,10 +363,10 @@ class State {
      * @param key - Key to delete
      */
     public deleteState(key:string) {
-        if(this.stateObject[key] == undefined) {
+        if(this.#stateObject[key] == undefined) {
             log(`State '${key}' does not exist. Therefore it cannot be deleted.`, 'warn');
         }
-        delete this.stateObject[key];
+        delete this.#stateObject[key];
     }
 
     /**
@@ -337,9 +374,9 @@ class State {
      * For changes to the DOM after load, call the `updateElements` function on the StateObject instead.
      */
     public reloadState() {
-        for(let key in this.stateObject) {
-            this.stateObject[key].findElements();
-            this.stateObject[key].updateElements();
+        for(let key in this.#stateObject) {
+            this.#stateObject[key].findElements();
+            this.#stateObject[key].updateElements();
 
             if(this.debugLogging) log(`🔃 Reloaded state '${key}'`, 'log');
         }
@@ -355,10 +392,12 @@ class State {
         const states = document.querySelectorAll('[ather-state]');
 
         states.forEach((state:HTMLElement) => {
-            if(this.debugLogging) log(`⚙️ Creating state '${state.getAttribute('ather-state')}' from page load.`, 'log');
-            const name = state.getAttribute('ather-state');
-            const value = state.getAttribute('ather-state-inital') || '';
-            this.createState(name,value);
+            if(this.#stateObject[state.getAttribute('ather-state')] == undefined) {
+                if(this.debugLogging) log(`⚙️ Creating state '${state.getAttribute('ather-state')}' from page load.`, 'log');
+                const name = state.getAttribute('ather-state');
+                const value = state.getAttribute('ather-state-inital') || '';
+                this.createState(name,value);
+            }
         })
     }
 }

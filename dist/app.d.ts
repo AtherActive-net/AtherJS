@@ -77,6 +77,12 @@ declare class AtherJS {
      */
     private parsePage;
     /**
+     * Execute all JS in the page. It is embedded in a script tag and executed.
+     * Note: Be careful with your script includes as it will include any script tag found in the body.
+     * @param body - The new page's body to take the scripts from.
+     */
+    private executeJS;
+    /**
      * Clean up and render the page to the hidden body
      * @param page - Page to clean
      * @returns `void`
@@ -98,6 +104,12 @@ declare class AtherJS {
      * @returns {Boolean} Returns wether or not the navigator exists
      */
     private doesNavigatorExist;
+    /**
+     * CHeck to see if a A tag is actually a Link or just a fancy button.
+     * @param link - Link to check
+     * @returns `bool` Is this link an actual link?
+     */
+    private validateLink;
 }
 /**
  * Deals with animations
@@ -122,9 +134,9 @@ declare class Anims {
  * State class. Deals with anyting related to state.
  */
 declare class State {
+    #private;
     debugLogging: boolean;
     createStatesOnPageLoad: boolean;
-    private stateObject;
     private updateElementListOnUpdate;
     constructor();
     /**
