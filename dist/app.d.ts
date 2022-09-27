@@ -42,6 +42,7 @@ declare class AtherJS {
     debugLogging: boolean;
     private animator;
     private state;
+    private isNavigating;
     /**
      * AtherJS Constructor
      * @param opts - Options for AtherJS

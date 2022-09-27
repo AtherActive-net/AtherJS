@@ -35,6 +35,7 @@ class AtherJS {
         this.debugLogging = opts.debugLogging || true;
         // Create a new State object
         this.state = new State();
+        this.isNavigating = false;
         if (!this.doesNavigatorExist()) {
             log('Navigator does not exist. AtherJS will not work.', 'error');
             return;
@@ -50,7 +51,13 @@ class AtherJS {
      */
     go(url) {
         return __awaiter(this, void 0, void 0, function* () {
-            yield this.navigate(url);
+            if (!this.isNavigating) {
+                this.isNavigating = true;
+                yield this.navigate(url);
+            }
+            else {
+                log(`Naviation is already in progress. Skipping navigation to ${url}`, 'warn');
+            }
         });
     }
     /**
@@ -100,7 +107,7 @@ class AtherJS {
             // And in the end we fade in the new page.
             yield this.animator.fadeIn(document.body.querySelector(this.body));
             document.dispatchEvent(new CustomEvent('atherjs:pagechange'));
-            event;
+            this.isNavigating = false;
         });
     }
     /**

@@ -44,6 +44,7 @@ class AtherJS {
     public debugLogging: boolean;
     private animator = new Anims();
     private state: State;
+    private isNavigating: boolean
 
     /**
      * AtherJS Constructor
@@ -62,6 +63,7 @@ class AtherJS {
 
         // Create a new State object
         this.state = new State();
+        this.isNavigating = false;
 
         if(!this.doesNavigatorExist()) {
             log('Navigator does not exist. AtherJS will not work.', 'error')
@@ -80,8 +82,13 @@ class AtherJS {
      * @param {string} url - URL to navigate to
      */
     public async go(url:string) {
-        await this.navigate(url);
-    }
+        if(!this.isNavigating) {
+            this.isNavigating = true;
+            await this.navigate(url);
+        } else {
+            log(`Naviation is already in progress. Skipping navigation to ${url}`, 'warn');
+        }
+    }   
 
     /**
      * Configure all found links to work with AtherJS.
@@ -135,7 +142,7 @@ class AtherJS {
         // And in the end we fade in the new page.
         await this.animator.fadeIn(document.body.querySelector(this.body))
         document.dispatchEvent(new CustomEvent('atherjs:pagechange'))
-        event
+        this.isNavigating = false;
 
 
     }
