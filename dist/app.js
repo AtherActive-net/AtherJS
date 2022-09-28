@@ -30,6 +30,7 @@ class AtherJS {
         }
     }) {
         this.animator = new Anims();
+        this.activeScriptNameStates = [];
         // Set the selector for the body. Per site it can be different, so it can be changed. Not setting it makes it default
         this.body = opts.bodyOverwrite || 'body';
         this.debugLogging = opts.debugLogging || true;
@@ -81,7 +82,7 @@ class AtherJS {
             else {
                 if (this.debugLogging)
                     log(`❌ Link ${link.href} disabled as it failed validation check.`, 'warn');
-                link.removeAttribute('href');
+                link.setAttribute('disabled', 'true');
             }
         });
     }
@@ -94,10 +95,13 @@ class AtherJS {
             // WE start with a fade animation
             yield this.animator.fadeOut(document.body.querySelector(this.body));
             const pageData = yield this.requestPage(url);
-            const body = yield this.parsePage(yield pageData);
+            const body = yield this.parsePage(pageData);
             // Cleanup and render the page
             this.cleanPage(body);
+            console.log(body);
+            this.destroyJSCache();
             this.executeJS(body);
+            this.reloadLinkElements(body);
             // update the URL at the top of the browser
             window.history.pushState({}, '', url);
             // We need to fully reload all links as these have not yet been intercepted.
@@ -151,16 +155,58 @@ class AtherJS {
     /**
      * Execute all JS in the page. It is embedded in a script tag and executed.
      * Note: Be careful with your script includes as it will include any script tag found in the body.
+     * It will run all scripts in EVAL. Be absolutely sure you trust the code!
      * @param body - The new page's body to take the scripts from.
      */
     executeJS(body) {
         const scripts = body.querySelectorAll('script');
         const basePage = document.body.querySelector(this.body);
         scripts.forEach((script) => {
+            // Check to see if a namespace is provided. If not, throw an error about it
+            const identifier = script.getAttribute('ather-namespace');
+            if (!identifier && this.debugLogging)
+                log(`❌ Script ${script.src} has no namespace identifier configured. It will never unload.`, 'error');
+            if (identifier) {
+                // Check if the script is already loaded. If so, skip it.
+                if (this.activeScriptNameStates.includes(identifier)) {
+                    if (this.debugLogging)
+                        log(`❌ Script ${script.src} is already loaded. Skipping it.`, 'warn');
+                    return;
+                }
+                // Add the script to the list of active scripts
+                this.activeScriptNameStates.push(identifier);
+            }
+            // Embed the script to the page. Also makes it execute.
             const newScript = document.createElement('script');
             newScript.innerHTML = script.innerHTML;
             newScript.src = script.src;
             basePage.appendChild(newScript);
+            log(`📜 Running script ${script.src} ('${identifier}')`);
+        });
+    }
+    /**
+     * Remove all old JS script namespaces so new ones can take their place.
+     */
+    destroyJSCache() {
+        this.activeScriptNameStates.forEach((scriptName) => {
+            if (this.debugLogging)
+                log(`🗑️ Destroying script '${scriptName}' from cache`);
+            delete window[scriptName];
+        });
+        this.activeScriptNameStates = [];
+    }
+    /**
+     * Reload all link tags found in the body. This is absolutely needed in order to import all stylesheets.
+     * @param body - The new page's body
+     */
+    reloadLinkElements(body) {
+        const links = body.querySelectorAll('link');
+        links.forEach((link) => {
+            const newLink = document.createElement('link');
+            newLink.rel = link.rel;
+            newLink.href = link.href;
+            newLink.type = link.type;
+            document.head.appendChild(newLink);
         });
     }
     /**

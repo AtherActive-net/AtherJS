@@ -43,6 +43,7 @@ declare class AtherJS {
     private animator;
     private state;
     private isNavigating;
+    private activeScriptNameStates;
     /**
      * AtherJS Constructor
      * @param opts - Options for AtherJS
@@ -80,9 +81,19 @@ declare class AtherJS {
     /**
      * Execute all JS in the page. It is embedded in a script tag and executed.
      * Note: Be careful with your script includes as it will include any script tag found in the body.
+     * It will run all scripts in EVAL. Be absolutely sure you trust the code!
      * @param body - The new page's body to take the scripts from.
      */
     private executeJS;
+    /**
+     * Remove all old JS script namespaces so new ones can take their place.
+     */
+    private destroyJSCache;
+    /**
+     * Reload all link tags found in the body. This is absolutely needed in order to import all stylesheets.
+     * @param body - The new page's body
+     */
+    private reloadLinkElements;
     /**
      * Clean up and render the page to the hidden body
      * @param page - Page to clean

@@ -45,6 +45,7 @@ class AtherJS {
     private animator = new Anims();
     private state: State;
     private isNavigating: boolean
+    private activeScriptNameStates: string[] = [];
 
     /**
      * AtherJS Constructor
@@ -112,7 +113,7 @@ class AtherJS {
                 }
             } else {
                 if(this.debugLogging) log(`❌ Link ${link.href} disabled as it failed validation check.`,'warn');
-                link.removeAttribute('href');
+                link.setAttribute('disabled', 'true');
             }
         })
     }
@@ -125,11 +126,16 @@ class AtherJS {
         // WE start with a fade animation
         await this.animator.fadeOut(document.body.querySelector(this.body))
         const pageData = await this.requestPage(url);
-        const body = await this.parsePage(await pageData);
+        const body = await this.parsePage(pageData);
         
         // Cleanup and render the page
         this.cleanPage(body);
+        console.log(body)
+
+        this.destroyJSCache();
         this.executeJS(body);
+
+        this.reloadLinkElements(body);
         // update the URL at the top of the browser
         window.history.pushState({}, '', url);
 
@@ -183,23 +189,64 @@ class AtherJS {
     private async parsePage(page:string) {
         const parser = new DOMParser();
         const doc = parser.parseFromString(page, 'text/html');
-        const body = doc.body
+        const body = doc.body;
         return body;
     }
 
     /**
      * Execute all JS in the page. It is embedded in a script tag and executed.
      * Note: Be careful with your script includes as it will include any script tag found in the body.
+     * It will run all scripts in EVAL. Be absolutely sure you trust the code!
      * @param body - The new page's body to take the scripts from.
      */
     private executeJS(body:HTMLElement) {
         const scripts = body.querySelectorAll('script');
         const basePage = document.body.querySelector(this.body);
         scripts.forEach((script) => {
+            // Check to see if a namespace is provided. If not, throw an error about it
+            const identifier = script.getAttribute('ather-namespace');
+            if(!identifier && this.debugLogging) log(`❌ Script ${script.src} has no namespace identifier configured. It will never unload.`, 'error');
+            if(identifier) {
+                // Check if the script is already loaded. If so, skip it.
+                if(this.activeScriptNameStates.includes(identifier)) {
+                    if(this.debugLogging) log(`❌ Script ${script.src} is already loaded. Skipping it.`, 'warn');
+                    return
+                }
+                // Add the script to the list of active scripts
+                this.activeScriptNameStates.push(identifier);
+            }
+            // Embed the script to the page. Also makes it execute.
             const newScript = document.createElement('script');
             newScript.innerHTML = script.innerHTML;
             newScript.src = script.src;
             basePage.appendChild(newScript);
+            log(`📜 Running script ${script.src} ('${identifier}')`)
+        })
+    }
+
+    /**
+     * Remove all old JS script namespaces so new ones can take their place.
+     */
+    private destroyJSCache() {
+        this.activeScriptNameStates.forEach((scriptName) => {
+            if(this.debugLogging) log(`🗑️ Destroying script '${scriptName}' from cache`);
+            delete window[scriptName];
+        })
+        this.activeScriptNameStates = [];
+    }
+
+    /**
+     * Reload all link tags found in the body. This is absolutely needed in order to import all stylesheets.
+     * @param body - The new page's body 
+     */
+    private reloadLinkElements(body:HTMLElement) {
+        const links = body.querySelectorAll('link');
+        links.forEach((link) => {
+            const newLink = document.createElement('link');
+            newLink.rel = link.rel;
+            newLink.href = link.href;
+            newLink.type = link.type;
+            document.head.appendChild(newLink);
         })
     }
 
