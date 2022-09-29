@@ -174,6 +174,12 @@ class AtherJS {
         })
     }
 
+    /**
+     * Convert a form to JSON. It reads all input, select and textarea elements.
+     * It then reads their name and value, and uses that to create a JSON object.
+     * @param form the form to convert to JSON
+     * @returns stringified JSON
+     */
     private formToJSON(form: HTMLFormElement) {
         let data = {};
         const elements = form.querySelectorAll('input, select, textarea');

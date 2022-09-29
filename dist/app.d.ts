@@ -70,6 +70,12 @@ declare class AtherJS {
      * Configure all found forms to work properly with AtherJS
      */
     private configForms;
+    /**
+     * Convert a form to JSON. It reads all input, select and textarea elements.
+     * It then reads their name and value, and uses that to create a JSON object.
+     * @param form the form to convert to JSON
+     * @returns stringified JSON
+     */
     private formToJSON;
     /**
      * Navigate to a (new) page
