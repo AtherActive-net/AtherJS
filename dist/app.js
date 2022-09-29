@@ -31,6 +31,7 @@ class AtherJS {
     }) {
         this.animator = new Anims();
         this.activeScriptNameStates = [];
+        this.urlHistory = [];
         // Set the selector for the body. Per site it can be different, so it can be changed. Not setting it makes it default
         this.body = opts.bodyOverwrite || 'body';
         this.debugLogging = opts.debugLogging || true;
@@ -43,7 +44,7 @@ class AtherJS {
         }
         log('✅ AtherJS is active!');
         document.addEventListener('DOMContentLoaded', () => {
-            this.configLinks();
+            this.go(window.location.href);
         });
     }
     /**
@@ -58,6 +59,17 @@ class AtherJS {
             }
             else {
                 log(`Naviation is already in progress. Skipping navigation to ${url}`, 'warn');
+            }
+        });
+    }
+    /**
+     * Go back 1 page if this is possible.
+     */
+    back() {
+        return __awaiter(this, void 0, void 0, function* () {
+            if (this.urlHistory.length > 1) {
+                this.urlHistory.pop();
+                yield this.go(this.urlHistory[this.urlHistory.length - 1]);
             }
         });
     }
@@ -80,11 +92,67 @@ class AtherJS {
                 }
             }
             else {
-                if (this.debugLogging)
-                    log(`❌ Link ${link.href} disabled as it failed validation check.`, 'warn');
-                link.setAttribute('disabled', 'true');
+                if (link.hasAttribute('ather-ignore')) {
+                    if (this.debugLogging)
+                        log(`🔗 Ignoring link ${link.nodeName}`);
+                }
+                else if (link.hasAttribute('ather-back')) {
+                    link.addEventListener('click', (e) => __awaiter(this, void 0, void 0, function* () {
+                        e.preventDefault();
+                        yield this.back();
+                    }));
+                }
+                else if (link.hasAttribute('dropdown')) {
+                    if (this.debugLogging)
+                        log(`🔗 Ignoring link ${link.nodeName}`);
+                }
+                else {
+                    if (this.debugLogging)
+                        log(`❌ Link ${link.href} disabled as it failed validation check.`, 'warn');
+                    link.setAttribute('debug', 'test');
+                    link.addEventListener('click', (e) => {
+                        e.preventDefault();
+                        if (this.debugLogging)
+                            log(`❌ Link ${link.href} disabled.`, 'warn');
+                    });
+                }
             }
         });
+    }
+    /**
+     * Configure all found forms to work properly with AtherJS
+     */
+    configForms() {
+        const forms = document.querySelectorAll('form');
+        forms.forEach((form) => {
+            if (form.hasAttribute('ather-ignore'))
+                return;
+            form.addEventListener('submit', (e) => __awaiter(this, void 0, void 0, function* () {
+                e.preventDefault();
+                // get form data, make sure it is in JSON format
+                const url = form.getAttribute('action');
+                const method = form.getAttribute('method');
+                const data = this.formToJSON(form);
+                let req = fetch(url, {
+                    method: method,
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: data
+                });
+                yield this.go((yield req).url);
+            }));
+            if (this.debugLogging)
+                log(`🔗 Configured form ${form.action} (${form.method})`);
+        });
+    }
+    formToJSON(form) {
+        let data = {};
+        const elements = form.querySelectorAll('input, select, textarea');
+        elements.forEach((element) => {
+            data[element.name] = element.value;
+        });
+        return JSON.stringify(data);
     }
     /**
      * Navigate to a (new) page
@@ -98,19 +166,20 @@ class AtherJS {
             const body = yield this.parsePage(pageData);
             // Cleanup and render the page
             this.cleanPage(body);
-            console.log(body);
             this.destroyJSCache();
             this.executeJS(body);
             this.reloadLinkElements(body);
             // update the URL at the top of the browser
             window.history.pushState({}, '', url);
-            // We need to fully reload all links as these have not yet been intercepted.
+            // Configure links and forms to work with AtherJS
             this.configLinks();
+            this.configForms();
             // Finally, we update all elements referencing State
             this.state.reloadState();
             // And in the end we fade in the new page.
             yield this.animator.fadeIn(document.body.querySelector(this.body));
             document.dispatchEvent(new CustomEvent('atherjs:pagechange'));
+            this.urlHistory.push(url);
             this.isNavigating = false;
         });
     }
@@ -123,6 +192,11 @@ class AtherJS {
         return __awaiter(this, void 0, void 0, function* () {
             if (this.debugLogging)
                 log(`🌍 Requesting page ${url}`);
+            if (url.split('/')[2] != window.location.href.split('/')[2]) {
+                log('Leaving current website. AtherJS will not handle it.', 'warn');
+                window.location.href = url;
+                return;
+            }
             // Time the fetch and display the time in the console if debugLogging is on
             let startTime = new Date();
             let req = yield fetch(url);
@@ -131,10 +205,8 @@ class AtherJS {
                 log(`📬 Page received in ${endTime.getTime() - startTime.getTime()}ms`);
             if (req.status !== 200) {
                 log(`Error while fetching page. Status code: ${req.status}`, 'error');
+                this.isNavigating = false;
                 return;
-            }
-            if (req.url.split('/')[2] != window.location.href.split('/')[2]) {
-                log('Leaving current website. AtherJS will not handle it.', 'warn');
             }
             return yield req.text();
         });
@@ -217,6 +289,7 @@ class AtherJS {
     cleanPage(page) {
         // Check if we need to rebuild important components. Will be skipped if not needed
         this.rebuildComponent(page.querySelector('nav'));
+        this.rebuildComponent(page.querySelector('footer'));
         // this.rebuildComponent(page.querySelector('footer'))
         this.rebuildBody(page);
         return;
@@ -303,7 +376,7 @@ class Anims {
                         resolve(true);
                     }
                     else {
-                        el.style.opacity = (parseFloat(el.style.opacity) - 0.01).toString();
+                        el.style.opacity = (parseFloat(el.style.opacity) - 0.05).toString();
                         requestAnimationFrame(fade);
                     }
                 })();

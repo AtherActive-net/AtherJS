@@ -44,6 +44,7 @@ declare class AtherJS {
     private state;
     private isNavigating;
     private activeScriptNameStates;
+    private urlHistory;
     /**
      * AtherJS Constructor
      * @param opts - Options for AtherJS
@@ -56,11 +57,20 @@ declare class AtherJS {
      */
     go(url: string): Promise<void>;
     /**
+     * Go back 1 page if this is possible.
+     */
+    back(): Promise<void>;
+    /**
      * Configure all found links to work with AtherJS.
      * If a link contains the `ather-ignore` attribute, it will be ignored.
      * This is run at startup, but can be called again to reconfigure all links.
      */
     configLinks(): void;
+    /**
+     * Configure all found forms to work properly with AtherJS
+     */
+    private configForms;
+    private formToJSON;
     /**
      * Navigate to a (new) page
      * @param url - URL to navigate to
