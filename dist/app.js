@@ -120,6 +120,15 @@ class AtherJS {
         });
     }
     /**
+     * Submit a form using AtherJS. Meant to replace form.submit()
+     * @param form the form to submit
+     */
+    submitForm(form) {
+        return __awaiter(this, void 0, void 0, function* () {
+            yield this.formSubmit(form, null);
+        });
+    }
+    /**
      * Configure all found forms to work properly with AtherJS
      */
     configForms() {
@@ -128,19 +137,7 @@ class AtherJS {
             if (form.hasAttribute('ather-ignore'))
                 return;
             form.addEventListener('submit', (e) => __awaiter(this, void 0, void 0, function* () {
-                e.preventDefault();
-                // get form data, make sure it is in JSON format
-                const url = form.getAttribute('action');
-                const method = form.getAttribute('method');
-                const data = this.formToJSON(form);
-                let req = fetch(url, {
-                    method: method,
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: data
-                });
-                yield this.go((yield req).url);
+                yield this.formSubmit(form, e);
             }));
             if (this.debugLogging)
                 log(`🔗 Configured form ${form.action} (${form.method})`);
@@ -159,6 +156,24 @@ class AtherJS {
             data[element.name] = element.value;
         });
         return JSON.stringify(data);
+    }
+    formSubmit(form, e) {
+        return __awaiter(this, void 0, void 0, function* () {
+            if (e != null)
+                e.preventDefault();
+            // get form data, make sure it is in JSON format
+            const url = form.getAttribute('action');
+            const method = form.getAttribute('method');
+            const data = this.formToJSON(form);
+            let req = fetch(url, {
+                method: method,
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: data
+            });
+            yield this.go((yield req).url);
+        });
     }
     /**
      * Navigate to a (new) page

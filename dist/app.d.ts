@@ -67,6 +67,11 @@ declare class AtherJS {
      */
     configLinks(): void;
     /**
+     * Submit a form using AtherJS. Meant to replace form.submit()
+     * @param form the form to submit
+     */
+    submitForm(form: HTMLFormElement): Promise<void>;
+    /**
      * Configure all found forms to work properly with AtherJS
      */
     private configForms;
@@ -77,6 +82,7 @@ declare class AtherJS {
      * @returns stringified JSON
      */
     private formToJSON;
+    private formSubmit;
     /**
      * Navigate to a (new) page
      * @param url - URL to navigate to

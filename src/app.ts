@@ -146,6 +146,14 @@ class AtherJS {
     }
 
     /**
+     * Submit a form using AtherJS. Meant to replace form.submit()
+     * @param form the form to submit
+     */
+    public async submitForm(form:HTMLFormElement) {
+        await this.formSubmit(form,null);
+    }
+
+    /**
      * Configure all found forms to work properly with AtherJS
      */
     private configForms() {
@@ -154,26 +162,13 @@ class AtherJS {
             if(form.hasAttribute('ather-ignore')) return;
 
             form.addEventListener('submit', async (e) => {
-                e.preventDefault();
-                // get form data, make sure it is in JSON format
-                
-                const url = form.getAttribute('action');
-                const method = form.getAttribute('method');
-                const data = this.formToJSON(form);
-                let req = fetch(url, {
-                    method: method,
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: data
-                })
-                await this.go((await req).url);
+                await this.formSubmit(form,e);
             })
-
+            
             if(this.debugLogging) log(`🔗 Configured form ${form.action} (${form.method})`)
         })
     }
-
+    
     /**
      * Convert a form to JSON. It reads all input, select and textarea elements.
      * It then reads their name and value, and uses that to create a JSON object.
@@ -186,8 +181,26 @@ class AtherJS {
         elements.forEach((element:HTMLInputElement) => {
             data[element.name] = element.value;
         })
-
+        
         return JSON.stringify(data);
+    }
+    
+    private async formSubmit(form:HTMLFormElement,e:SubmitEvent) {
+        if(e!=null) e.preventDefault();
+        // get form data, make sure it is in JSON format
+        
+        const url = form.getAttribute('action');
+        const method = form.getAttribute('method');
+        const data = this.formToJSON(form);
+        let req = fetch(url, {
+            method: method,
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: data
+        })
+        await this.go((await req).url);
+
     }
 
     /**
