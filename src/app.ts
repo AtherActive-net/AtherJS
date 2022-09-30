@@ -74,7 +74,7 @@ class AtherJS {
 
         log('✅ AtherJS is active!');
         document.addEventListener('DOMContentLoaded', () => {
-            this.go(window.location.href);
+            this.go(window.location.href,false);
         })
     }
 
@@ -82,10 +82,10 @@ class AtherJS {
      * Navigate to a page.
      * @param {string} url - URL to navigate to
      */
-    public async go(url:string) {
+    public async go(url:string,playAnims:boolean=true) {
         if(!this.isNavigating) {
             this.isNavigating = true;
-            await this.navigate(url);
+            await this.navigate(url,playAnims);
         } else {
             log(`Naviation is already in progress. Skipping navigation to ${url}`, 'warn');
         }
@@ -194,9 +194,9 @@ class AtherJS {
      * Navigate to a (new) page
      * @param url - URL to navigate to
      */
-    private async navigate(url:string) {
+    private async navigate(url:string,playAnims:boolean=true) {
         // WE start with a fade animation
-        await this.animator.fadeOut(document.body.querySelector(this.body))
+        if(playAnims) await this.animator.fadeOut(document.body.querySelector(this.body))
         const pageData = await this.requestPage(url);
         const body = await this.parsePage(pageData);
         
@@ -218,7 +218,7 @@ class AtherJS {
         this.state.reloadState();
 
         // And in the end we fade in the new page.
-        await this.animator.fadeIn(document.body.querySelector(this.body))
+        if(playAnims)await this.animator.fadeIn(document.body.querySelector(this.body))
         document.dispatchEvent(new CustomEvent('atherjs:pagechange'))
         this.urlHistory.push(url);
         this.isNavigating = false;

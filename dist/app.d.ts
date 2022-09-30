@@ -55,7 +55,7 @@ declare class AtherJS {
      * Navigate to a page.
      * @param {string} url - URL to navigate to
      */
-    go(url: string): Promise<void>;
+    go(url: string, playAnims?: boolean): Promise<void>;
     /**
      * Go back 1 page if this is possible.
      */
