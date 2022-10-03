@@ -32,7 +32,8 @@ interface AtherOptions {
  */
 interface StateOptions {
     updateElementListOnUpdate?: boolean,
-    reloadOnSetState?: boolean
+    reloadOnSetState?: boolean,
+    createStatesOnPageLoad?: boolean
 }
 
 /**
@@ -42,6 +43,21 @@ interface StateOptions {
 class AtherJS {
     public body: string;
     public debugLogging: boolean;
+    public useCSSForFading: boolean;
+    public CSSFadeOptions: {
+        fadeInCSSClass: string,
+        fadeOutCSSClass: string
+    }
+    public jsFadeOptions: {
+        fadeNavbar: boolean,
+        fadeFooter: boolean
+    }
+    public stateOptions: StateOptions = {
+        updateElementListOnUpdate: true,
+        reloadOnSetState: true
+    }
+
+
     private animator = new Anims();
     private state: State;
     private isNavigating: boolean
@@ -54,14 +70,30 @@ class AtherJS {
      * @returns `void`
      */
     constructor(opts: AtherOptions={
+        bodyOverwrite: 'body',
+        debugLogging: false,
         useCSSForFading: false,
+        cssFadeOptions: {
+            fadeInCSSClass: 'fadeIn',
+            fadeOutCSSClass: 'fadeOut'
+        },
+        jsFadeOptions: {
+            fadeNavbar: true,
+            fadeFooter: true
+        },
         state: {
-            updateElementListOnUpdate: true
+            updateElementListOnUpdate: true,
+            reloadOnSetState: true
         }
     }) {
-        // Set the selector for the body. Per site it can be different, so it can be changed. Not setting it makes it default
+        // This setting must be set before anything else to make sure it works properly
         this.body = opts.bodyOverwrite || 'body';
-        this.debugLogging = opts.debugLogging || true;
+
+        Object.keys(opts).forEach((key) => {
+            if(this.hasOwnProperty(key)) {
+                this[key] = opts[key];
+            }
+        })
 
         // Create a new State object
         this.state = new State();
@@ -447,13 +479,29 @@ class Anims {
  * State class. Deals with anyting related to state.
  */
 class State {
-    public debugLogging:boolean = true;
+    public debugLogging:boolean
     public createStatesOnPageLoad:boolean = true;
 
-    #stateObject:object = {};
     private updateElementListOnUpdate:boolean = true;
+    #stateObject:object = {};
 
-    constructor() {
+    constructor(opts:AtherOptions={
+        debugLogging: false,
+        state: {
+            createStatesOnPageLoad: true,
+            updateElementListOnUpdate: true,
+            reloadOnSetState: true
+        }
+    }) {
+        this.debugLogging = opts.debugLogging;
+
+        // load options for state
+        Object.keys(opts.state).forEach((key) => {
+            if(opts.state.hasOwnProperty(key)) {
+                this[key] = opts.state[key];
+            }
+        })
+
         if(this.createStatesOnPageLoad){
             document.addEventListener('DOMContentLoaded', () => {
                 this.createOnLoad();

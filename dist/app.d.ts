@@ -32,6 +32,7 @@ interface AtherOptions {
 interface StateOptions {
     updateElementListOnUpdate?: boolean;
     reloadOnSetState?: boolean;
+    createStatesOnPageLoad?: boolean;
 }
 /**
  * AtherJS base class. Contains all functionality and hooks
@@ -40,6 +41,16 @@ interface StateOptions {
 declare class AtherJS {
     body: string;
     debugLogging: boolean;
+    useCSSForFading: boolean;
+    CSSFadeOptions: {
+        fadeInCSSClass: string;
+        fadeOutCSSClass: string;
+    };
+    jsFadeOptions: {
+        fadeNavbar: boolean;
+        fadeFooter: boolean;
+    };
+    stateOptions: StateOptions;
     private animator;
     private state;
     private isNavigating;
@@ -172,7 +183,7 @@ declare class State {
     debugLogging: boolean;
     createStatesOnPageLoad: boolean;
     private updateElementListOnUpdate;
-    constructor();
+    constructor(opts?: AtherOptions);
     /**
      * Update a value on the State Object
      * @param key - Key to set

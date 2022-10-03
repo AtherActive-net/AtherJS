@@ -24,17 +24,36 @@ class AtherJS {
      * @returns `void`
      */
     constructor(opts = {
+        bodyOverwrite: 'body',
+        debugLogging: false,
         useCSSForFading: false,
+        cssFadeOptions: {
+            fadeInCSSClass: 'fadeIn',
+            fadeOutCSSClass: 'fadeOut'
+        },
+        jsFadeOptions: {
+            fadeNavbar: true,
+            fadeFooter: true
+        },
         state: {
-            updateElementListOnUpdate: true
+            updateElementListOnUpdate: true,
+            reloadOnSetState: true
         }
     }) {
+        this.stateOptions = {
+            updateElementListOnUpdate: true,
+            reloadOnSetState: true
+        };
         this.animator = new Anims();
         this.activeScriptNameStates = [];
         this.urlHistory = [];
-        // Set the selector for the body. Per site it can be different, so it can be changed. Not setting it makes it default
+        // This setting must be set before anything else to make sure it works properly
         this.body = opts.bodyOverwrite || 'body';
-        this.debugLogging = opts.debugLogging || true;
+        Object.keys(opts).forEach((key) => {
+            if (this.hasOwnProperty(key)) {
+                this[key] = opts[key];
+            }
+        });
         // Create a new State object
         this.state = new State();
         this.isNavigating = false;
@@ -411,11 +430,24 @@ class Anims {
  * State class. Deals with anyting related to state.
  */
 class State {
-    constructor() {
-        this.debugLogging = true;
+    constructor(opts = {
+        debugLogging: false,
+        state: {
+            createStatesOnPageLoad: true,
+            updateElementListOnUpdate: true,
+            reloadOnSetState: true
+        }
+    }) {
         this.createStatesOnPageLoad = true;
-        _State_stateObject.set(this, {});
         this.updateElementListOnUpdate = true;
+        _State_stateObject.set(this, {});
+        this.debugLogging = opts.debugLogging;
+        // load options for state
+        Object.keys(opts.state).forEach((key) => {
+            if (opts.state.hasOwnProperty(key)) {
+                this[key] = opts.state[key];
+            }
+        });
         if (this.createStatesOnPageLoad) {
             document.addEventListener('DOMContentLoaded', () => {
                 this.createOnLoad();
