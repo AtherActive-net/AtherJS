@@ -207,21 +207,32 @@ class AtherJS {
             const body = yield this.parsePage(pageData);
             // Cleanup and render the page
             this.cleanPage(body);
-            this.destroyJSCache();
-            this.executeJS(body);
+            try {
+                this.destroyJSCache();
+                this.executeJS(body);
+            }
+            catch (e) {
+                log(`❌ Failed to execute JS: ${e}`, 'error');
+            }
             this.reloadLinkElements(body);
             // update the URL at the top of the browser
             window.history.pushState({}, '', url);
             // Configure links and forms to work with AtherJS
-            this.configLinks();
-            this.configForms();
+            try {
+                this.configLinks();
+                this.configForms();
+            }
+            catch (e) {
+                log(`❌ Failed to configure links and forms: ${e}`, 'error');
+            }
             // Finally, we update all elements referencing State
             this.state.reloadState();
             // And in the end we fade in the new page.
             if (playAnims)
                 yield this.animator.fadeIn(document.body.querySelector(this.body));
             document.dispatchEvent(new CustomEvent('atherjs:pagechange'));
-            this.urlHistory.push(url);
+            // Store the URL in the History array. We cut off the arguments as it may cause issues and generally is not needed.
+            this.urlHistory.push(url.split('?')[0]);
             this.isNavigating = false;
         });
     }
