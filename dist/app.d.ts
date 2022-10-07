@@ -31,7 +31,6 @@ interface AtherOptions {
  */
 interface StateOptions {
     updateElementListOnUpdate?: boolean;
-    reloadOnSetState?: boolean;
     createStatesOnPageLoad?: boolean;
 }
 /**
@@ -180,8 +179,8 @@ declare class Anims {
  */
 declare class State {
     #private;
-    debugLogging: boolean;
-    createStatesOnPageLoad: boolean;
+    private debugLogging;
+    private createStatesOnPageLoad;
     private updateElementListOnUpdate;
     constructor(opts?: AtherOptions);
     /**

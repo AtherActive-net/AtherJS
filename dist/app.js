@@ -37,12 +37,10 @@ class AtherJS {
         },
         state: {
             updateElementListOnUpdate: true,
-            reloadOnSetState: true
         }
     }) {
         this.stateOptions = {
             updateElementListOnUpdate: true,
-            reloadOnSetState: true
         };
         this.animator = new Anims();
         this.activeScriptNameStates = [];
@@ -287,6 +285,8 @@ class AtherJS {
         const scripts = body.querySelectorAll('script');
         const basePage = document.body.querySelector(this.body);
         scripts.forEach((script) => {
+            if (script.hasAttribute('ather-ignore'))
+                return;
             // Check to see if a namespace is provided. If not, throw an error about it
             const identifier = script.getAttribute('ather-namespace');
             if (!identifier && this.debugLogging)
@@ -446,7 +446,6 @@ class State {
         state: {
             createStatesOnPageLoad: true,
             updateElementListOnUpdate: true,
-            reloadOnSetState: true
         }
     }) {
         this.createStatesOnPageLoad = true;

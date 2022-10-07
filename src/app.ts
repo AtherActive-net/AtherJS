@@ -32,7 +32,6 @@ interface AtherOptions {
  */
 interface StateOptions {
     updateElementListOnUpdate?: boolean,
-    reloadOnSetState?: boolean,
     createStatesOnPageLoad?: boolean
 }
 
@@ -54,9 +53,7 @@ class AtherJS {
     }
     public stateOptions: StateOptions = {
         updateElementListOnUpdate: true,
-        reloadOnSetState: true
     }
-
 
     private animator = new Anims();
     private state: State;
@@ -83,7 +80,6 @@ class AtherJS {
         },
         state: {
             updateElementListOnUpdate: true,
-            reloadOnSetState: true
         }
     }) {
         // This setting must be set before anything else to make sure it works properly
@@ -232,7 +228,6 @@ class AtherJS {
             body: data
         })
         await this.go((await req).url);
-
     }
 
     /**
@@ -332,6 +327,8 @@ class AtherJS {
         const scripts = body.querySelectorAll('script');
         const basePage = document.body.querySelector(this.body);
         scripts.forEach((script) => {
+            if(script.hasAttribute('ather-ignore')) return;
+            
             // Check to see if a namespace is provided. If not, throw an error about it
             const identifier = script.getAttribute('ather-namespace');
             if(!identifier && this.debugLogging) log(`❌ Script ${script.src} has no namespace identifier configured. It will never unload.`, 'error');
@@ -488,10 +485,10 @@ class Anims {
  * State class. Deals with anyting related to state.
  */
 class State {
-    public debugLogging:boolean
-    public createStatesOnPageLoad:boolean = true;
-
+    private debugLogging:boolean
+    private createStatesOnPageLoad:boolean = true;
     private updateElementListOnUpdate:boolean = true;
+    
     #stateObject:object = {};
 
     constructor(opts:AtherOptions={
@@ -499,7 +496,6 @@ class State {
         state: {
             createStatesOnPageLoad: true,
             updateElementListOnUpdate: true,
-            reloadOnSetState: true
         }
     }) {
         this.debugLogging = opts.debugLogging;
