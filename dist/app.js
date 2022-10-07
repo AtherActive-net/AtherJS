@@ -20,7 +20,7 @@ var _State_stateObject;
 class AtherJS {
     /**
      * AtherJS Constructor
-     * @param opts - Options for AtherJS
+     * @param {AtherOptions} opts - Options for AtherJS
      * @returns `void`
      */
     constructor(opts = {
@@ -45,6 +45,10 @@ class AtherJS {
         this.animator = new Anims();
         this.activeScriptNameStates = [];
         this.urlHistory = [];
+        if (!this.doesNavigatorExist()) {
+            log('Navigator does not exist. AtherJS will not work.', 'error');
+            return;
+        }
         // This setting must be set before anything else to make sure it works properly
         this.body = opts.bodyOverwrite || 'body';
         Object.keys(opts).forEach((key) => {
@@ -55,14 +59,24 @@ class AtherJS {
         // Create a new State object
         this.state = new State();
         this.isNavigating = false;
-        if (!this.doesNavigatorExist()) {
-            log('Navigator does not exist. AtherJS will not work.', 'error');
-            return;
-        }
+        // Disable JS navigation if needed
+        this.disableJSNavIfNeeded();
         log('✅ AtherJS is active!');
         document.addEventListener('DOMContentLoaded', () => {
             this.go(window.location.href, false);
         });
+    }
+    /**
+     * Disables most JS navigation functionality as it is not compatible with AtherJS.
+     * This is done by setting the `disableJSNavigation` property to `true`.
+     * @returns void
+     */
+    disableJSNavIfNeeded() {
+        if (!this.disableJSNavigation)
+            return;
+        history.back = () => { };
+        history.forward = () => { };
+        history.go = () => { };
     }
     /**
      * Navigate to a page.
@@ -138,7 +152,7 @@ class AtherJS {
     }
     /**
      * Submit a form using AtherJS. Meant to replace form.submit()
-     * @param form the form to submit
+     * @param {HTMLFormElement} form the form to submit
      */
     submitForm(form) {
         return __awaiter(this, void 0, void 0, function* () {
@@ -163,7 +177,7 @@ class AtherJS {
     /**
      * Convert a form to JSON. It reads all input, select and textarea elements.
      * It then reads their name and value, and uses that to create a JSON object.
-     * @param form the form to convert to JSON
+     * @param {HTMLFormElement} form the form to convert to JSON
      * @returns stringified JSON
      */
     formToJSON(form) {
@@ -174,6 +188,11 @@ class AtherJS {
         });
         return JSON.stringify(data);
     }
+    /**
+     * Actually submit a form. Underthe hood function for `submitForm()` and handles most of the logic.
+     * @param {HTMLFormElement} form the form to submit
+     * @param {SubmitEvent} e the submit event
+     */
     formSubmit(form, e) {
         return __awaiter(this, void 0, void 0, function* () {
             if (e != null)
@@ -194,7 +213,8 @@ class AtherJS {
     }
     /**
      * Navigate to a (new) page
-     * @param url - URL to navigate to
+     * @param {string} url - URL to navigate to
+     * @param {boolean} playAnims - Whether or not to play animations
      */
     navigate(url, playAnims = true) {
         return __awaiter(this, void 0, void 0, function* () {
@@ -236,7 +256,7 @@ class AtherJS {
     }
     /**
      * Request a page and return its body
-     * @param url - URL to request
+     * @param {string} url - URL to request
      * @returns `string` Returns the page body
      */
     requestPage(url) {
@@ -264,7 +284,7 @@ class AtherJS {
     }
     /**
      * Parse the page and return the body
-     * @param page - Page to parse
+     * @param {string} page - Page to parse
      * @returns body - Returns the body of the page
      */
     parsePage(page) {
@@ -279,7 +299,7 @@ class AtherJS {
      * Execute all JS in the page. It is embedded in a script tag and executed.
      * Note: Be careful with your script includes as it will include any script tag found in the body.
      * It will run all scripts in EVAL. Be absolutely sure you trust the code!
-     * @param body - The new page's body to take the scripts from.
+     * @param {HTMLElement} body - The new page's body to take the scripts from.
      */
     executeJS(body) {
         const scripts = body.querySelectorAll('script');
@@ -322,7 +342,7 @@ class AtherJS {
     }
     /**
      * Reload all link tags found in the body. This is absolutely needed in order to import all stylesheets.
-     * @param body - The new page's body
+     * @param {HTMLElement} body - The new page's body
      */
     reloadLinkElements(body) {
         const links = body.querySelectorAll('link');
@@ -336,7 +356,7 @@ class AtherJS {
     }
     /**
      * Clean up and render the page to the hidden body
-     * @param page - Page to clean
+     * @param {Element} page - Page to clean
      * @returns `void`
      */
     cleanPage(page) {
@@ -349,7 +369,7 @@ class AtherJS {
     }
     /**
      * Rebuild a component, if it is required
-     * @param component - Component to replace the current component with
+     * @param {Element} component - Component to replace the current component with
      * @returns `bool` Was this component rebuilt?
      */
     rebuildComponent(component) {
@@ -361,7 +381,7 @@ class AtherJS {
     }
     /**
      * Rebuild the "body" of the page.
-     * @param body - Body to replace the current body with
+     * @param {Element} body - Body to replace the current body with
      */
     rebuildBody(body) {
         document.body.querySelector(this.body).innerHTML = '';
@@ -376,7 +396,7 @@ class AtherJS {
     }
     /**
      * CHeck to see if a A tag is actually a Link or just a fancy button.
-     * @param link - Link to check
+     * @param {HTMLAnchorElement} link - Link to check
      * @returns `bool` Is this link an actual link?
      */
     validateLink(link) {
@@ -391,11 +411,10 @@ class AtherJS {
 class Anims {
     /**
      * Play a fade in animation
-     * @param el - Element to fade in
-     * @param time - Time to fade in
+     * @param {HTMLElement} el - Element to fade in
      * @returns `Promise` Resolves when the animation is complete
      */
-    fadeIn(el, time = 100) {
+    fadeIn(el) {
         return __awaiter(this, void 0, void 0, function* () {
             return new Promise((resolve, reject) => {
                 el.style.opacity = '0';
@@ -415,11 +434,10 @@ class Anims {
     }
     /**
      * Play a fade out animation
-     * @param el - Element to fade out
-     * @param time - Time to fade out
+     * @param {HTMLElement} el - Element to fade out
      * @returns `Promise` Resolves when the animation is complete
      */
-    fadeOut(el, time = 100) {
+    fadeOut(el) {
         return __awaiter(this, void 0, void 0, function* () {
             return new Promise((resolve, reject) => {
                 el.style.opacity = '1';
@@ -466,8 +484,8 @@ class State {
     }
     /**
      * Update a value on the State Object
-     * @param key - Key to set
-     * @param value - Value to set
+     * @param {string} key - Key to set
+     * @param {any} value - Value to set
      */
     setState(key, value) {
         if (__classPrivateFieldGet(this, _State_stateObject, "f")[key] == undefined) {
@@ -482,15 +500,15 @@ class State {
     }
     /**
      * Create a new State. This can be used to transfer values between pages.
-     * @param name - Name of the state
-     * @param value - Initial value of the state
+     * @param {string} name - Name of the state
+     * @param {any} value - Initial value of the state
      */
     createState(name, value) {
         __classPrivateFieldGet(this, _State_stateObject, "f")[name] = new StateObject(name, value);
     }
     /**
      * Get a value of a state.
-     * @param key - Key to get
+     * @param {string} key - Key to get
      * @returns value of the key
      */
     getState(key) {
@@ -502,7 +520,7 @@ class State {
     }
     /**
      * Delete a State from the Manager. This action is irreversible.
-     * @param key - Key to delete
+     * @param {string} key - Key to delete
      */
     deleteState(key) {
         if (__classPrivateFieldGet(this, _State_stateObject, "f")[key] == undefined) {
@@ -586,8 +604,9 @@ class StateObject {
 }
 /**
 * Log a message to the console
-* @param msg - Message to log
-* @param type - Type of log
+* @param {string} msg - Message to log
+* @param {string} type - Type of log
+* All supported types: 'log', 'warn', 'error'
 */
 function log(msg, type = "log") {
     switch (type) {
