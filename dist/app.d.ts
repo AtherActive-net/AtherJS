@@ -69,7 +69,7 @@ declare class AtherJS {
      * This is done by setting the `disableJSNavigation` property to `true`.
      * @returns void
      */
-    private disableJSNavIfNeeded;
+    private disableJsNav;
     /**
      * Navigate to a page.
      * @param {string} url - URL to navigate to

@@ -94,9 +94,7 @@ class AtherJS {
         this.body = opts.bodyOverwrite || 'body';
 
         Object.keys(opts).forEach((key) => {
-            if(this.hasOwnProperty(key)) {
-                this[key] = opts[key];
-            }
+            this[key] = opts[key];
         })
 
         // Create a new State object
@@ -104,7 +102,7 @@ class AtherJS {
         this.isNavigating = false;
 
         // Disable JS navigation if needed
-        this.disableJSNavIfNeeded();
+        if(this.disableJSNavigation) this.disableJsNav();
 
         log('✅ AtherJS is active!');
         document.addEventListener('DOMContentLoaded', () => {
@@ -117,8 +115,7 @@ class AtherJS {
      * This is done by setting the `disableJSNavigation` property to `true`.
      * @returns void
      */
-    private disableJSNavIfNeeded(): void {
-        if(!this.disableJSNavigation) return;
+    private disableJsNav(): void {
         history.back=()=>{};
         history.forward=()=>{};
         history.go=()=>{};
@@ -525,9 +522,7 @@ class State {
 
         // load options for state
         Object.keys(opts.state).forEach((key) => {
-            if(opts.state.hasOwnProperty(key)) {
-                this[key] = opts.state[key];
-            }
+            this[key] = opts.state[key];
         })
 
         if(this.createStatesOnPageLoad){
