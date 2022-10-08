@@ -98,6 +98,7 @@ class AtherJS {
             if (this.urlHistory.length > 1) {
                 this.urlHistory.pop();
                 yield this.go(this.urlHistory[this.urlHistory.length - 1]);
+                this.urlHistory.pop();
             }
         });
     }
