@@ -110,6 +110,7 @@ class AtherJS {
     configLinks() {
         const links = document.querySelectorAll('a');
         links.forEach((link) => {
+            // Its a bit of a christmas tree, but best I could come up with
             if (this.validateLink(link)) {
                 if (!link.hasAttribute('ather-ignore')) {
                     link.addEventListener('click', (e) => __awaiter(this, void 0, void 0, function* () {
@@ -223,6 +224,8 @@ class AtherJS {
             const body = yield this.parsePage(pageData);
             // Cleanup and render the page
             this.cleanPage(body);
+            // We reload link elements to allow scripts to create objects that require these styles.
+            this.reloadLinkElements(body);
             try {
                 this.destroyJSCache();
                 this.executeJS(body);
@@ -230,7 +233,6 @@ class AtherJS {
             catch (e) {
                 log(`❌ Failed to execute JS: ${e}`, 'error');
             }
-            this.reloadLinkElements(body);
             // update the URL at the top of the browser
             window.history.pushState({}, '', url);
             // Configure links and forms to work with AtherJS
@@ -324,7 +326,8 @@ class AtherJS {
             newScript.innerHTML = script.innerHTML;
             newScript.src = script.src;
             basePage.appendChild(newScript);
-            log(`📜 Running script ${script.src} ('${identifier}')`);
+            if (this.debugLogging)
+                log(`📜 Running script ${script.src} ('${identifier}')`);
         });
     }
     /**

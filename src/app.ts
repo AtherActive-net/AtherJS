@@ -154,6 +154,7 @@ class AtherJS {
         const links = document.querySelectorAll('a');
         links.forEach((link) =>{
 
+            // Its a bit of a christmas tree, but best I could come up with
             if(this.validateLink(link)) {
 
                 if(!link.hasAttribute('ather-ignore')) {
@@ -169,17 +170,20 @@ class AtherJS {
                 if(link.hasAttribute('ather-ignore')) {
                     if(this.debugLogging) log(`🔗 Ignoring link ${link.nodeName}`)
                 }
+
                 else if(link.hasAttribute('ather-back')) {
                     link.addEventListener('click', async (e) => {
                         e.preventDefault();
                         await this.back();
                     })
+
                 } else if(link.hasAttribute('dropdown')) {
                     if(this.debugLogging) log(`🔗 Ignoring link ${link.nodeName}`)
 
                 } else {
                     if(this.debugLogging) log(`❌ Link ${link.href} disabled as it failed validation check.`,'warn');
                     link.setAttribute('debug','test');
+
                     link.addEventListener('click', (e) => {
                         e.preventDefault();
                         if(this.debugLogging) log(`❌ Link ${link.href} disabled.`,'warn');
@@ -266,6 +270,8 @@ class AtherJS {
         // Cleanup and render the page
         this.cleanPage(body);
 
+        // We reload link elements to allow scripts to create objects that require these styles.
+        this.reloadLinkElements(body);
 
         try {
             this.destroyJSCache();
@@ -274,7 +280,6 @@ class AtherJS {
             log(`❌ Failed to execute JS: ${e}`, 'error');
         }
         
-        this.reloadLinkElements(body);
         // update the URL at the top of the browser
         window.history.pushState({}, '', url);
 
@@ -369,7 +374,7 @@ class AtherJS {
             newScript.innerHTML = script.innerHTML;
             newScript.src = script.src;
             basePage.appendChild(newScript);
-            log(`📜 Running script ${script.src} ('${identifier}')`)
+            if(this.debugLogging) log(`📜 Running script ${script.src} ('${identifier}')`)
         })
     }
 
