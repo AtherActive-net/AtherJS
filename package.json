@@ -16,6 +16,8 @@
   "homepage": "https://atherdev.nl/",
   "module": "dist/app.js",
   "devDependencies": {
-    "ts-loader": "^9.4.1"
+    "ts-loader": "^9.4.1",
+    "webpack": "^5.75.0",
+    "webpack-cli": "^5.0.1"
   }
 }
