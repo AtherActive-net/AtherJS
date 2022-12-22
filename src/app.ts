@@ -424,6 +424,7 @@ class AtherJS {
      * @returns `bool` Was this component rebuilt?
      */
     private rebuildComponent(component:Element) {
+        if(!component) return false;
         if(component.hasAttribute('ather-rebuild')) {
             document.body.querySelector(component.tagName).replaceWith(component);
             return true;
