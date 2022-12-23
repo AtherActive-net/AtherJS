@@ -9,14 +9,15 @@
  * @param jsFadeOptions - Options for JS fading.
  * @param jsFadeOptions.fadeNavbar - Wether or not to fade the navbar
  * @param jsFadeOptions.fadeFooter - Wether or not to fade the footer
- * @param state - Settings related to State
- * @param state.updateStateElementsOnUpdate - Wether or not to update state elements on state update
+ * @param store - Settings related to State
+ * @param store.updateStateElementsOnUpdate - Wether or not to update state elements on state update
  */
 interface AtherOptions {
     bodyOverwrite?: string
     debugLogging?: boolean
     useCSSForFading?: boolean
     disableJSNavigation?: boolean
+    useInternalFunctionMount?: boolean
     cssFadeOptions?: {
         fadeInCSSClass?: string
         fadeOutCSSClass?: string
@@ -25,27 +26,51 @@ interface AtherOptions {
         fadeNavbar?: boolean
         fadeFooter?: boolean
     },
-    state?: StateOptions
+    store?: StoreOptions
 }
 
 /**
- * Option Class for State
+ * Option Class for Store
  * @param updateElementListOnUpdate - Wether or not to update state elements on state update. `true` by default.
  */
-interface StateOptions {
+interface StoreOptions {
     updateElementListOnUpdate?: boolean,
     createStatesOnPageLoad?: boolean
 }
+
+const attributes = new Map<string,string>([
+    ['state', 'at-state'],
+    ['state-value', 'at-state-value'],
+    ['state-init', 'at-state-initial'],
+    ['ignore', 'at-ignore'],
+    ['back', 'at-back'],
+    ['link', 'at-link'],
+    ['namespace', 'at-namespace'],
+    ['rebuild', 'at-rebuild'],
+
+    // Overwrites
+    ['onsubmit', 'at-onsubmit'],
+    ['onchange', 'at-onchange'],
+    ['onclick', 'at-onclick'],
+    ['oninput', 'at-oninput'],
+    ['onkeydown', 'at-onkeydown'],
+    ['onkeyup', 'at-onkeyup'],
+    ['onkeypress', 'at-onkeypress'],
+    
+    // prevent
+    ['prevent', 'at-prevent'],
+])
 
 /**
  * AtherJS base class. Contains all functionality and hooks
  * @param {AtherOptions} options - Options for AtherJS
  */
-class AtherJS {
+export class AtherJS {
     public body: string;
-    public debugLogging: boolean;
-    public useCSSForFading: boolean;
-    private disableJSNavigation:boolean;
+    public debugLogging: boolean = false;
+    public useCSSForFading: boolean = false;
+    private disableJSNavigation:boolean = true;
+    private useInternalFunctionMount: boolean = false;
     public CSSFadeOptions: {
         fadeInCSSClass: string,
         fadeOutCSSClass: string
@@ -54,13 +79,14 @@ class AtherJS {
         fadeNavbar: boolean,
         fadeFooter: boolean
     }
-    public stateOptions: StateOptions = {
+    public stateOptions: StoreOptions = {
         updateElementListOnUpdate: true,
     }
 
     private animator = new Anims();
-    private state: State;
+    private store: Store;
     private isNavigating: boolean
+    public pageCache: Object = {};
     private activeScriptNameStates: string[] = [];
     private urlHistory: string[] = [];
 
@@ -73,6 +99,7 @@ class AtherJS {
         bodyOverwrite: 'body',
         debugLogging: false,
         useCSSForFading: false,
+        useInternalFunctionMount: false,
         cssFadeOptions: {
             fadeInCSSClass: 'fadeIn',
             fadeOutCSSClass: 'fadeOut'
@@ -81,7 +108,7 @@ class AtherJS {
             fadeNavbar: true,
             fadeFooter: true
         },
-        state: {
+        store: {
             updateElementListOnUpdate: true,
         }
     }) {
@@ -98,7 +125,7 @@ class AtherJS {
         })
 
         // Create a new State object
-        this.state = new State();
+        this.store = new Store();
         this.isNavigating = false;
 
         // Disable JS navigation if needed
@@ -157,7 +184,7 @@ class AtherJS {
             // Its a bit of a christmas tree, but best I could come up with
             if(this.validateLink(link)) {
 
-                if(!link.hasAttribute('ather-ignore')) {
+                if(!link.hasAttribute(attributes.get('ignore'))) {
 
                     link.addEventListener('click', async (e) => {
                         e.preventDefault();
@@ -167,19 +194,15 @@ class AtherJS {
                     if(this.debugLogging) log(`🔗 Configured link ${link.href}`)
                 }
             } else {
-                if(link.hasAttribute('ather-ignore')) {
+                if(link.hasAttribute(attributes.get('ignore'))) {
                     if(this.debugLogging) log(`🔗 Ignoring link ${link.nodeName}`)
                 }
 
-                else if(link.hasAttribute('ather-back')) {
+                else if(link.hasAttribute(attributes.get('back'))) {
                     link.addEventListener('click', async (e) => {
                         e.preventDefault();
                         await this.back();
                     })
-
-                } else if(link.hasAttribute('dropdown')) {
-                    if(this.debugLogging) log(`🔗 Ignoring link ${link.nodeName}`)
-
                 } else {
                     if(this.debugLogging) log(`❌ Link ${link.href} disabled as it failed validation check.`,'warn');
                     link.setAttribute('debug','test');
@@ -207,13 +230,13 @@ class AtherJS {
     private configForms() {
         const forms = document.querySelectorAll('form');
         forms.forEach((form) => {
-            if(form.hasAttribute('ather-ignore')) return;
-
-            form.addEventListener('submit', async (e) => {
-                await this.formSubmit(form,e);
-            })
-            
-            if(this.debugLogging) log(`🔗 Configured form ${form.action} (${form.method})`)
+            if(form.hasAttribute(attributes.get('ignore'))) return;
+            if(form.hasAttribute('action')) {
+                form.addEventListener('submit', async (e) => {
+                    await this.formSubmit(form,e);
+                })
+                if(this.debugLogging) log(`🔗 Configured form ${form.action} (${form.method})`)
+            }
         })
     }
     
@@ -239,7 +262,7 @@ class AtherJS {
      * @param {HTMLFormElement} form the form to submit 
      * @param {SubmitEvent} e the submit event
      */
-    private async formSubmit(form:HTMLFormElement,e:SubmitEvent) {
+    private async formSubmit(form:HTMLFormElement,e:SubmitEvent|null) {
         if(e!=null) e.preventDefault();
         // get form data, make sure it is in JSON format
         
@@ -263,9 +286,9 @@ class AtherJS {
      */
     private async navigate(url:string,playAnims:boolean=true) {
         // WE start with a fade animation
-        if(playAnims) await this.animator.fadeOut(document.body.querySelector(this.body))
+        if(playAnims) await this.animator.fadeOut(document.body.querySelector(this.body) as HTMLElement)
         const pageData = await this.requestPage(url);
-        const body = await this.parsePage(pageData);
+        const body = await this.parsePage(pageData as string);
         
         // Cleanup and render the page
         this.cleanPage(body);
@@ -291,10 +314,11 @@ class AtherJS {
             log(`❌ Failed to configure links and forms: ${e}`, 'error');
         }
         // Finally, we update all elements referencing State
-        this.state.reloadState();
+        this.store.reloadState();
+        this.hookEvents();
 
         // And in the end we fade in the new page.
-        if(playAnims)await this.animator.fadeIn(document.body.querySelector(this.body))
+        if(playAnims)await this.animator.fadeIn(document.body.querySelector(this.body) as HTMLElement)
         document.dispatchEvent(new CustomEvent('atherjs:pagechange'))
         // Store the URL in the History array. We cut off the arguments as it may cause issues and generally is not needed.
         this.urlHistory.push(url.split('?')[0]);
@@ -355,10 +379,10 @@ class AtherJS {
         const scripts = body.querySelectorAll('script');
         const basePage = document.body.querySelector(this.body);
         scripts.forEach((script) => {
-            if(script.hasAttribute('ather-ignore')) return;
+            if(script.hasAttribute(attributes.get('ignore'))) return;
             
             // Check to see if a namespace is provided. If not, throw an error about it
-            const identifier = script.getAttribute('ather-namespace');
+            const identifier = script.getAttribute(attributes.get('namespace'));
             if(!identifier && this.debugLogging) log(`❌ Script ${script.src} has no namespace identifier configured. It will never unload.`, 'error');
             if(identifier) {
                 // Check if the script is already loaded. If so, skip it.
@@ -425,7 +449,7 @@ class AtherJS {
      */
     private rebuildComponent(component:Element) {
         if(!component) return false;
-        if(component.hasAttribute('ather-rebuild')) {
+        if(component.hasAttribute(attributes.get('rebuild'))) {
             document.body.querySelector(component.tagName).replaceWith(component);
             return true;
         }
@@ -456,8 +480,75 @@ class AtherJS {
      * @returns `bool` Is this link an actual link?
      */
     private validateLink(link:HTMLAnchorElement) {
-        if(link.href == window.location.href) return false;
+        // if(link.href == window.location.href) return false;
         return link.href.includes('http')
+    }
+
+    private hookEvents() {
+        const elements = document.querySelectorAll(`[${attributes.get('onchange')}],[${attributes.get('onclick')}],[${attributes.get('oninput')}],[${attributes.get('onkeydown')}],[${attributes.get('onkeyup')}],[${attributes.get('onkeypress')}],[${attributes.get('onsubmit')}]
+        `)
+
+        elements.forEach((element) => {
+            this.bindElementCustomEvents(element);
+        })
+    }
+
+    /**
+     * Bind custom events to elements base don their attributes
+     * @param {Element} element Element to bind events to
+     */
+    private bindElementCustomEvents(element:Element) {
+        // switch case based on specific attributes
+        switch(true) {
+            case element.hasAttribute(attributes.get('ignore')):
+                break;
+            
+            case element.hasAttribute(attributes.get('onchange')):
+                this.addEventHandler(element, 'change', 'onchange');
+                break;
+                
+            case element.hasAttribute(attributes.get('onclick')):
+                this.addEventHandler(element, 'click', 'onclick');
+                break;
+
+            case element.hasAttribute(attributes.get('oninput')):
+                this.addEventHandler(element, 'input', 'oninput');
+                break;
+
+            case element.hasAttribute(attributes.get('onkeydown')):
+                this.addEventHandler(element, 'keydown', 'onkeydown');
+                break;
+
+            case element.hasAttribute(attributes.get('onkeyup')):
+                this.addEventHandler(element, 'keyup', 'onkeyup');
+                break;
+            
+            case element.hasAttribute(attributes.get('onkeypress')):
+                this.addEventHandler(element, 'keypress', 'onkeypress');
+                break;
+
+            case element.hasAttribute(attributes.get('onsubmit')):
+                this.addEventHandler(element, 'submit', 'onsubmit');
+                break;
+        }
+    }
+
+    /**
+     * Add event handlers to elements based on a specific attribute
+     * @param {Element} element The element to add the event listenener too
+     * @param {string} attribute The attribute to listen for
+     * @param {string} fetchAttribute The attribute to fetch the function name from
+     */
+    private addEventHandler(element:Element,attribute:string,fetchAttribute:string) {
+        element.addEventListener(attribute, (e) => {
+            if(element.hasAttribute(attributes.get('prevent'))) e.preventDefault();
+            const functionName = element.getAttribute(attributes.get(fetchAttribute));
+            if(this.useInternalFunctionMount) {
+                this.pageCache[functionName](element,e);
+                return;
+            }
+            window[functionName](element,e);
+        })
     }
 
 }
@@ -511,7 +602,7 @@ class Anims {
 /**
  * State class. Deals with anyting related to state.
  */
-class State {
+class Store {
     private debugLogging:boolean
     private createStatesOnPageLoad:boolean = true;
     private updateElementListOnUpdate:boolean = true;
@@ -520,7 +611,7 @@ class State {
 
     constructor(opts:AtherOptions={
         debugLogging: false,
-        state: {
+        store: {
             createStatesOnPageLoad: true,
             updateElementListOnUpdate: true,
         }
@@ -528,8 +619,8 @@ class State {
         this.debugLogging = opts.debugLogging;
 
         // load options for state
-        Object.keys(opts.state).forEach((key) => {
-            this[key] = opts.state[key];
+        Object.keys(opts.store).forEach((key) => {
+            this[key] = opts.store[key];
         })
 
         if(this.createStatesOnPageLoad){
@@ -546,8 +637,8 @@ class State {
      */
     public setState(key:string,value:any) {
         if(this.#stateObject[key] == undefined) {
-            log(`State key '${key}' does not exist. Creating it..`, 'warn');
-            log('States should be created manually before setting values.', 'warn');
+            log(`Store key '${key}' does not exist. Creating it..`, 'warn');
+            log('Stores should be created manually before setting values.', 'warn');
             this.createState(key, value)
         }
         this.#stateObject[key].value = value;
@@ -573,7 +664,7 @@ class State {
      */
     public getState(key:string) {
         if(this.#stateObject[key] == undefined) {
-            log(`State '${key}' does not exist. Returning undefined`, 'warn');
+            log(`Store '${key}' does not exist. Returning undefined`, 'warn');
             return undefined;
         }
         return this.#stateObject[key].value;
@@ -585,7 +676,7 @@ class State {
      */
     public deleteState(key:string) {
         if(this.#stateObject[key] == undefined) {
-            log(`State '${key}' does not exist. Therefore it cannot be deleted.`, 'warn');
+            log(`Store '${key}' does not exist. Therefore it cannot be deleted.`, 'warn');
         }
         delete this.#stateObject[key];
     }
@@ -613,10 +704,10 @@ class State {
         const states = document.querySelectorAll('[ather-state]');
 
         states.forEach((state:HTMLElement) => {
-            if(this.#stateObject[state.getAttribute('ather-state')] == undefined) {
-                if(this.debugLogging) log(`⚙️ Creating state '${state.getAttribute('ather-state')}' from page load.`, 'log');
-                const name = state.getAttribute('ather-state');
-                const value = state.getAttribute('ather-state-inital') || '';
+            if(this.#stateObject[state.getAttribute(attributes.get('state'))] == undefined) {
+                if(this.debugLogging) log(`⚙️ Creating state '${state.getAttribute(attributes.get('state'))}' from page load.`, 'log');
+                const name = state.getAttribute(attributes.get('state'));
+                const value = state.getAttribute(attributes.get('state-init')) || '';
                 this.createState(name,value);
             }
         })
@@ -642,7 +733,7 @@ class StateObject {
      * Find all elements that reference this state
      */
     public findElements() {
-        this.referencedElements = Array.from(document.querySelectorAll(`[ather-state="${this.name}"]`));
+        this.referencedElements = Array.from(document.querySelectorAll(`[at-state="${this.name}"]`));
     }
 
     /**
@@ -650,9 +741,9 @@ class StateObject {
      */
     public updateElements() {
         this.referencedElements.forEach((el) => {
-            if(el.getAttribute('ather-state-value')) {
-                const key = el.getAttribute('ather-state');
-                const value = el.getAttribute('ather-state-value');
+            if(el.getAttribute(attributes.get('state-value'))) {
+                const key = el.getAttribute(attributes.get('state'));
+                const value = el.getAttribute(attributes.get('state-value'));
                 if(!value) {
                     log(`No value value requested by element.`, 'warn');
                     return;

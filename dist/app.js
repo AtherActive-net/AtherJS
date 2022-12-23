@@ -12,12 +12,32 @@ var __classPrivateFieldGet = (this && this.__classPrivateFieldGet) || function (
     if (typeof state === "function" ? receiver !== state || !f : !state.has(receiver)) throw new TypeError("Cannot read private member from an object whose class did not declare it");
     return kind === "m" ? f : kind === "a" ? f.call(receiver) : f ? f.value : state.get(receiver);
 };
-var _State_stateObject;
+var _Store_stateObject;
+const attributes = new Map([
+    ['state', 'at-state'],
+    ['state-value', 'at-state-value'],
+    ['state-init', 'at-state-initial'],
+    ['ignore', 'at-ignore'],
+    ['back', 'at-back'],
+    ['link', 'at-link'],
+    ['namespace', 'at-namespace'],
+    ['rebuild', 'at-rebuild'],
+    // Overwrites
+    ['onsubmit', 'at-onsubmit'],
+    ['onchange', 'at-onchange'],
+    ['onclick', 'at-onclick'],
+    ['oninput', 'at-oninput'],
+    ['onkeydown', 'at-onkeydown'],
+    ['onkeyup', 'at-onkeyup'],
+    ['onkeypress', 'at-onkeypress'],
+    // prevent
+    ['prevent', 'at-prevent'],
+]);
 /**
  * AtherJS base class. Contains all functionality and hooks
  * @param {AtherOptions} options - Options for AtherJS
  */
-class AtherJS {
+export class AtherJS {
     /**
      * AtherJS Constructor
      * @param {AtherOptions} opts - Options for AtherJS
@@ -27,6 +47,7 @@ class AtherJS {
         bodyOverwrite: 'body',
         debugLogging: false,
         useCSSForFading: false,
+        useInternalFunctionMount: false,
         cssFadeOptions: {
             fadeInCSSClass: 'fadeIn',
             fadeOutCSSClass: 'fadeOut'
@@ -35,14 +56,19 @@ class AtherJS {
             fadeNavbar: true,
             fadeFooter: true
         },
-        state: {
+        store: {
             updateElementListOnUpdate: true,
         }
     }) {
+        this.debugLogging = false;
+        this.useCSSForFading = false;
+        this.disableJSNavigation = true;
+        this.useInternalFunctionMount = false;
         this.stateOptions = {
             updateElementListOnUpdate: true,
         };
         this.animator = new Anims();
+        this.pageCache = {};
         this.activeScriptNameStates = [];
         this.urlHistory = [];
         if (!this.doesNavigatorExist()) {
@@ -55,7 +81,7 @@ class AtherJS {
             this[key] = opts[key];
         });
         // Create a new State object
-        this.state = new State();
+        this.store = new Store();
         this.isNavigating = false;
         // Disable JS navigation if needed
         if (this.disableJSNavigation)
@@ -112,7 +138,7 @@ class AtherJS {
         links.forEach((link) => {
             // Its a bit of a christmas tree, but best I could come up with
             if (this.validateLink(link)) {
-                if (!link.hasAttribute('ather-ignore')) {
+                if (!link.hasAttribute(attributes.get('ignore'))) {
                     link.addEventListener('click', (e) => __awaiter(this, void 0, void 0, function* () {
                         e.preventDefault();
                         yield this.go(link.href);
@@ -122,19 +148,15 @@ class AtherJS {
                 }
             }
             else {
-                if (link.hasAttribute('ather-ignore')) {
+                if (link.hasAttribute(attributes.get('ignore'))) {
                     if (this.debugLogging)
                         log(`🔗 Ignoring link ${link.nodeName}`);
                 }
-                else if (link.hasAttribute('ather-back')) {
+                else if (link.hasAttribute(attributes.get('back'))) {
                     link.addEventListener('click', (e) => __awaiter(this, void 0, void 0, function* () {
                         e.preventDefault();
                         yield this.back();
                     }));
-                }
-                else if (link.hasAttribute('dropdown')) {
-                    if (this.debugLogging)
-                        log(`🔗 Ignoring link ${link.nodeName}`);
                 }
                 else {
                     if (this.debugLogging)
@@ -164,13 +186,15 @@ class AtherJS {
     configForms() {
         const forms = document.querySelectorAll('form');
         forms.forEach((form) => {
-            if (form.hasAttribute('ather-ignore'))
+            if (form.hasAttribute(attributes.get('ignore')))
                 return;
-            form.addEventListener('submit', (e) => __awaiter(this, void 0, void 0, function* () {
-                yield this.formSubmit(form, e);
-            }));
-            if (this.debugLogging)
-                log(`🔗 Configured form ${form.action} (${form.method})`);
+            if (form.hasAttribute('action')) {
+                form.addEventListener('submit', (e) => __awaiter(this, void 0, void 0, function* () {
+                    yield this.formSubmit(form, e);
+                }));
+                if (this.debugLogging)
+                    log(`🔗 Configured form ${form.action} (${form.method})`);
+            }
         });
     }
     /**
@@ -244,7 +268,8 @@ class AtherJS {
                 log(`❌ Failed to configure links and forms: ${e}`, 'error');
             }
             // Finally, we update all elements referencing State
-            this.state.reloadState();
+            this.store.reloadState();
+            this.hookEvents();
             // And in the end we fade in the new page.
             if (playAnims)
                 yield this.animator.fadeIn(document.body.querySelector(this.body));
@@ -305,10 +330,10 @@ class AtherJS {
         const scripts = body.querySelectorAll('script');
         const basePage = document.body.querySelector(this.body);
         scripts.forEach((script) => {
-            if (script.hasAttribute('ather-ignore'))
+            if (script.hasAttribute(attributes.get('ignore')))
                 return;
             // Check to see if a namespace is provided. If not, throw an error about it
-            const identifier = script.getAttribute('ather-namespace');
+            const identifier = script.getAttribute(attributes.get('namespace'));
             if (!identifier && this.debugLogging)
                 log(`❌ Script ${script.src} has no namespace identifier configured. It will never unload.`, 'error');
             if (identifier) {
@@ -376,7 +401,7 @@ class AtherJS {
     rebuildComponent(component) {
         if (!component)
             return false;
-        if (component.hasAttribute('ather-rebuild')) {
+        if (component.hasAttribute(attributes.get('rebuild'))) {
             document.body.querySelector(component.tagName).replaceWith(component);
             return true;
         }
@@ -403,9 +428,65 @@ class AtherJS {
      * @returns `bool` Is this link an actual link?
      */
     validateLink(link) {
-        if (link.href == window.location.href)
-            return false;
+        // if(link.href == window.location.href) return false;
         return link.href.includes('http');
+    }
+    hookEvents() {
+        const elements = document.querySelectorAll(`[${attributes.get('onchange')}],[${attributes.get('onclick')}],[${attributes.get('oninput')}],[${attributes.get('onkeydown')}],[${attributes.get('onkeyup')}],[${attributes.get('onkeypress')}],[${attributes.get('onsubmit')}]
+        `);
+        elements.forEach((element) => {
+            this.bindElementCustomEvents(element);
+        });
+    }
+    /**
+     * Bind custom events to elements base don their attributes
+     * @param {Element} element Element to bind events to
+     */
+    bindElementCustomEvents(element) {
+        // switch case based on specific attributes
+        switch (true) {
+            case element.hasAttribute(attributes.get('ignore')):
+                break;
+            case element.hasAttribute(attributes.get('onchange')):
+                this.addEventHandler(element, 'change', 'onchange');
+                break;
+            case element.hasAttribute(attributes.get('onclick')):
+                this.addEventHandler(element, 'click', 'onclick');
+                break;
+            case element.hasAttribute(attributes.get('oninput')):
+                this.addEventHandler(element, 'input', 'oninput');
+                break;
+            case element.hasAttribute(attributes.get('onkeydown')):
+                this.addEventHandler(element, 'keydown', 'onkeydown');
+                break;
+            case element.hasAttribute(attributes.get('onkeyup')):
+                this.addEventHandler(element, 'keyup', 'onkeyup');
+                break;
+            case element.hasAttribute(attributes.get('onkeypress')):
+                this.addEventHandler(element, 'keypress', 'onkeypress');
+                break;
+            case element.hasAttribute(attributes.get('onsubmit')):
+                this.addEventHandler(element, 'submit', 'onsubmit');
+                break;
+        }
+    }
+    /**
+     * Add event handlers to elements based on a specific attribute
+     * @param {Element} element The element to add the event listenener too
+     * @param {string} attribute The attribute to listen for
+     * @param {string} fetchAttribute The attribute to fetch the function name from
+     */
+    addEventHandler(element, attribute, fetchAttribute) {
+        element.addEventListener(attribute, (e) => {
+            if (element.hasAttribute(attributes.get('prevent')))
+                e.preventDefault();
+            const functionName = element.getAttribute(attributes.get(fetchAttribute));
+            if (this.useInternalFunctionMount) {
+                this.pageCache[functionName](element, e);
+                return;
+            }
+            window[functionName](element, e);
+        });
     }
 }
 /**
@@ -461,21 +542,21 @@ class Anims {
 /**
  * State class. Deals with anyting related to state.
  */
-class State {
+class Store {
     constructor(opts = {
         debugLogging: false,
-        state: {
+        store: {
             createStatesOnPageLoad: true,
             updateElementListOnUpdate: true,
         }
     }) {
         this.createStatesOnPageLoad = true;
         this.updateElementListOnUpdate = true;
-        _State_stateObject.set(this, {});
+        _Store_stateObject.set(this, {});
         this.debugLogging = opts.debugLogging;
         // load options for state
-        Object.keys(opts.state).forEach((key) => {
-            this[key] = opts.state[key];
+        Object.keys(opts.store).forEach((key) => {
+            this[key] = opts.store[key];
         });
         if (this.createStatesOnPageLoad) {
             document.addEventListener('DOMContentLoaded', () => {
@@ -489,14 +570,14 @@ class State {
      * @param {any} value - Value to set
      */
     setState(key, value) {
-        if (__classPrivateFieldGet(this, _State_stateObject, "f")[key] == undefined) {
-            log(`State key '${key}' does not exist. Creating it..`, 'warn');
-            log('States should be created manually before setting values.', 'warn');
+        if (__classPrivateFieldGet(this, _Store_stateObject, "f")[key] == undefined) {
+            log(`Store key '${key}' does not exist. Creating it..`, 'warn');
+            log('Stores should be created manually before setting values.', 'warn');
             this.createState(key, value);
         }
-        __classPrivateFieldGet(this, _State_stateObject, "f")[key].value = value;
+        __classPrivateFieldGet(this, _Store_stateObject, "f")[key].value = value;
         if (this.updateElementListOnUpdate) {
-            __classPrivateFieldGet(this, _State_stateObject, "f")[key].updateElements();
+            __classPrivateFieldGet(this, _Store_stateObject, "f")[key].updateElements();
         }
     }
     /**
@@ -505,7 +586,7 @@ class State {
      * @param {any} value - Initial value of the state
      */
     createState(name, value) {
-        __classPrivateFieldGet(this, _State_stateObject, "f")[name] = new StateObject(name, value);
+        __classPrivateFieldGet(this, _Store_stateObject, "f")[name] = new StateObject(name, value);
     }
     /**
      * Get a value of a state.
@@ -513,30 +594,30 @@ class State {
      * @returns value of the key
      */
     getState(key) {
-        if (__classPrivateFieldGet(this, _State_stateObject, "f")[key] == undefined) {
-            log(`State '${key}' does not exist. Returning undefined`, 'warn');
+        if (__classPrivateFieldGet(this, _Store_stateObject, "f")[key] == undefined) {
+            log(`Store '${key}' does not exist. Returning undefined`, 'warn');
             return undefined;
         }
-        return __classPrivateFieldGet(this, _State_stateObject, "f")[key].value;
+        return __classPrivateFieldGet(this, _Store_stateObject, "f")[key].value;
     }
     /**
      * Delete a State from the Manager. This action is irreversible.
      * @param {string} key - Key to delete
      */
     deleteState(key) {
-        if (__classPrivateFieldGet(this, _State_stateObject, "f")[key] == undefined) {
-            log(`State '${key}' does not exist. Therefore it cannot be deleted.`, 'warn');
+        if (__classPrivateFieldGet(this, _Store_stateObject, "f")[key] == undefined) {
+            log(`Store '${key}' does not exist. Therefore it cannot be deleted.`, 'warn');
         }
-        delete __classPrivateFieldGet(this, _State_stateObject, "f")[key];
+        delete __classPrivateFieldGet(this, _Store_stateObject, "f")[key];
     }
     /**
      * Reload all elements that interact with State. Required after changing pages.
      * For changes to the DOM after load, call the `updateElements` function on the StateObject instead.
      */
     reloadState() {
-        for (let key in __classPrivateFieldGet(this, _State_stateObject, "f")) {
-            __classPrivateFieldGet(this, _State_stateObject, "f")[key].findElements();
-            __classPrivateFieldGet(this, _State_stateObject, "f")[key].updateElements();
+        for (let key in __classPrivateFieldGet(this, _Store_stateObject, "f")) {
+            __classPrivateFieldGet(this, _Store_stateObject, "f")[key].findElements();
+            __classPrivateFieldGet(this, _Store_stateObject, "f")[key].updateElements();
             if (this.debugLogging)
                 log(`🔃 Reloaded state '${key}'`, 'log');
         }
@@ -550,17 +631,17 @@ class State {
             return;
         const states = document.querySelectorAll('[ather-state]');
         states.forEach((state) => {
-            if (__classPrivateFieldGet(this, _State_stateObject, "f")[state.getAttribute('ather-state')] == undefined) {
+            if (__classPrivateFieldGet(this, _Store_stateObject, "f")[state.getAttribute(attributes.get('state'))] == undefined) {
                 if (this.debugLogging)
-                    log(`⚙️ Creating state '${state.getAttribute('ather-state')}' from page load.`, 'log');
-                const name = state.getAttribute('ather-state');
-                const value = state.getAttribute('ather-state-inital') || '';
+                    log(`⚙️ Creating state '${state.getAttribute(attributes.get('state'))}' from page load.`, 'log');
+                const name = state.getAttribute(attributes.get('state'));
+                const value = state.getAttribute(attributes.get('state-init')) || '';
                 this.createState(name, value);
             }
         });
     }
 }
-_State_stateObject = new WeakMap();
+_Store_stateObject = new WeakMap();
 /**
  * A State Object is a single state. It contains the value, and a reference to elements that interact with it.
  */
@@ -576,16 +657,16 @@ class StateObject {
      * Find all elements that reference this state
      */
     findElements() {
-        this.referencedElements = Array.from(document.querySelectorAll(`[ather-state="${this.name}"]`));
+        this.referencedElements = Array.from(document.querySelectorAll(`[at-state="${this.name}"]`));
     }
     /**
      * Update all elements that reference this state
      */
     updateElements() {
         this.referencedElements.forEach((el) => {
-            if (el.getAttribute('ather-state-value')) {
-                const key = el.getAttribute('ather-state');
-                const value = el.getAttribute('ather-state-value');
+            if (el.getAttribute(attributes.get('state-value'))) {
+                const key = el.getAttribute(attributes.get('state'));
+                const value = el.getAttribute(attributes.get('state-value'));
                 if (!value) {
                     log(`No value value requested by element.`, 'warn');
                     return;

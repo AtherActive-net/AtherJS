@@ -9,14 +9,15 @@
  * @param jsFadeOptions - Options for JS fading.
  * @param jsFadeOptions.fadeNavbar - Wether or not to fade the navbar
  * @param jsFadeOptions.fadeFooter - Wether or not to fade the footer
- * @param state - Settings related to State
- * @param state.updateStateElementsOnUpdate - Wether or not to update state elements on state update
+ * @param store - Settings related to State
+ * @param store.updateStateElementsOnUpdate - Wether or not to update state elements on state update
  */
 interface AtherOptions {
     bodyOverwrite?: string;
     debugLogging?: boolean;
     useCSSForFading?: boolean;
     disableJSNavigation?: boolean;
+    useInternalFunctionMount?: boolean;
     cssFadeOptions?: {
         fadeInCSSClass?: string;
         fadeOutCSSClass?: string;
@@ -25,13 +26,13 @@ interface AtherOptions {
         fadeNavbar?: boolean;
         fadeFooter?: boolean;
     };
-    state?: StateOptions;
+    store?: StoreOptions;
 }
 /**
- * Option Class for State
+ * Option Class for Store
  * @param updateElementListOnUpdate - Wether or not to update state elements on state update. `true` by default.
  */
-interface StateOptions {
+interface StoreOptions {
     updateElementListOnUpdate?: boolean;
     createStatesOnPageLoad?: boolean;
 }
@@ -39,11 +40,12 @@ interface StateOptions {
  * AtherJS base class. Contains all functionality and hooks
  * @param {AtherOptions} options - Options for AtherJS
  */
-declare class AtherJS {
+export declare class AtherJS {
     body: string;
     debugLogging: boolean;
     useCSSForFading: boolean;
     private disableJSNavigation;
+    private useInternalFunctionMount;
     CSSFadeOptions: {
         fadeInCSSClass: string;
         fadeOutCSSClass: string;
@@ -52,10 +54,11 @@ declare class AtherJS {
         fadeNavbar: boolean;
         fadeFooter: boolean;
     };
-    stateOptions: StateOptions;
+    stateOptions: StoreOptions;
     private animator;
-    private state;
+    private store;
     private isNavigating;
+    pageCache: Object;
     private activeScriptNameStates;
     private urlHistory;
     /**
@@ -169,88 +172,18 @@ declare class AtherJS {
      * @returns `bool` Is this link an actual link?
      */
     private validateLink;
+    private hookEvents;
+    /**
+     * Bind custom events to elements base don their attributes
+     * @param {Element} element Element to bind events to
+     */
+    private bindElementCustomEvents;
+    /**
+     * Add event handlers to elements based on a specific attribute
+     * @param {Element} element The element to add the event listenener too
+     * @param {string} attribute The attribute to listen for
+     * @param {string} fetchAttribute The attribute to fetch the function name from
+     */
+    private addEventHandler;
 }
-/**
- * Deals with animations
- */
-declare class Anims {
-    /**
-     * Play a fade in animation
-     * @param {HTMLElement} el - Element to fade in
-     * @returns `Promise` Resolves when the animation is complete
-     */
-    fadeIn(el: HTMLElement): Promise<unknown>;
-    /**
-     * Play a fade out animation
-     * @param {HTMLElement} el - Element to fade out
-     * @returns `Promise` Resolves when the animation is complete
-     */
-    fadeOut(el: HTMLElement): Promise<unknown>;
-}
-/**
- * State class. Deals with anyting related to state.
- */
-declare class State {
-    #private;
-    private debugLogging;
-    private createStatesOnPageLoad;
-    private updateElementListOnUpdate;
-    constructor(opts?: AtherOptions);
-    /**
-     * Update a value on the State Object
-     * @param {string} key - Key to set
-     * @param {any} value - Value to set
-     */
-    setState(key: string, value: any): void;
-    /**
-     * Create a new State. This can be used to transfer values between pages.
-     * @param {string} name - Name of the state
-     * @param {any} value - Initial value of the state
-     */
-    createState(name: string, value: any): void;
-    /**
-     * Get a value of a state.
-     * @param {string} key - Key to get
-     * @returns value of the key
-     */
-    getState(key: string): any;
-    /**
-     * Delete a State from the Manager. This action is irreversible.
-     * @param {string} key - Key to delete
-     */
-    deleteState(key: string): void;
-    /**
-     * Reload all elements that interact with State. Required after changing pages.
-     * For changes to the DOM after load, call the `updateElements` function on the StateObject instead.
-     */
-    reloadState(): void;
-    /**
-     * Create new states on initial page load.
-     * @returns void
-     */
-    private createOnLoad;
-}
-/**
- * A State Object is a single state. It contains the value, and a reference to elements that interact with it.
- */
-declare class StateObject {
-    private name;
-    private value;
-    private referencedElements;
-    constructor(name: string, value: any);
-    /**
-     * Find all elements that reference this state
-     */
-    findElements(): void;
-    /**
-     * Update all elements that reference this state
-     */
-    updateElements(): void;
-}
-/**
-* Log a message to the console
-* @param {string} msg - Message to log
-* @param {string} type - Type of log
-* All supported types: 'log', 'warn', 'error'
-*/
-declare function log(msg: string, type?: string): void;
+export {};
