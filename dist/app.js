@@ -14,9 +14,9 @@ var __classPrivateFieldGet = (this && this.__classPrivateFieldGet) || function (
 };
 var _Store_stateObject;
 const attributes = new Map([
-    ['state', 'at-state'],
-    ['state-value', 'at-state-value'],
-    ['state-init', 'at-state-initial'],
+    ['state', 'at-store'],
+    ['state-value', 'at-store-value'],
+    ['state-init', 'at-store-initial'],
     ['ignore', 'at-ignore'],
     ['back', 'at-back'],
     ['link', 'at-link'],
@@ -47,7 +47,6 @@ export class AtherJS {
         bodyOverwrite: 'body',
         debugLogging: false,
         useCSSForFading: false,
-        useInternalFunctionMount: false,
         cssFadeOptions: {
             fadeInCSSClass: 'fadeIn',
             fadeOutCSSClass: 'fadeOut'
@@ -63,7 +62,6 @@ export class AtherJS {
         this.debugLogging = false;
         this.useCSSForFading = false;
         this.disableJSNavigation = true;
-        this.useInternalFunctionMount = false;
         this.stateOptions = {
             updateElementListOnUpdate: true,
         };
@@ -277,6 +275,20 @@ export class AtherJS {
             // Store the URL in the History array. We cut off the arguments as it may cause issues and generally is not needed.
             this.urlHistory.push(url.split('?')[0]);
             this.isNavigating = false;
+            // Update the script references
+            yield this.loadPageScript();
+        });
+    }
+    loadPageScript() {
+        return __awaiter(this, void 0, void 0, function* () {
+            const script = document.querySelector('script:not([src])');
+            if (script == null)
+                return;
+            // We encode the script to make it work with import()
+            const encoded = encodeURIComponent(script.innerHTML);
+            const uri = `data:text/javascript;charset=utf-8,${encoded}`;
+            const imports = yield import(uri);
+            this.pageScript = yield imports;
         });
     }
     /**
@@ -481,11 +493,7 @@ export class AtherJS {
             if (element.hasAttribute(attributes.get('prevent')))
                 e.preventDefault();
             const functionName = element.getAttribute(attributes.get(fetchAttribute));
-            if (this.useInternalFunctionMount) {
-                this.pageCache[functionName](element, e);
-                return;
-            }
-            window[functionName](element, e);
+            this.pageScript[functionName](element, e);
         });
     }
 }
@@ -569,11 +577,11 @@ class Store {
      * @param {string} key - Key to set
      * @param {any} value - Value to set
      */
-    setState(key, value) {
+    setStore(key, value) {
         if (__classPrivateFieldGet(this, _Store_stateObject, "f")[key] == undefined) {
             log(`Store key '${key}' does not exist. Creating it..`, 'warn');
             log('Stores should be created manually before setting values.', 'warn');
-            this.createState(key, value);
+            this.createStore(key, value);
         }
         __classPrivateFieldGet(this, _Store_stateObject, "f")[key].value = value;
         if (this.updateElementListOnUpdate) {
@@ -585,7 +593,7 @@ class Store {
      * @param {string} name - Name of the state
      * @param {any} value - Initial value of the state
      */
-    createState(name, value) {
+    createStore(name, value) {
         __classPrivateFieldGet(this, _Store_stateObject, "f")[name] = new StateObject(name, value);
     }
     /**
@@ -593,7 +601,7 @@ class Store {
      * @param {string} key - Key to get
      * @returns value of the key
      */
-    getState(key) {
+    getStore(key) {
         if (__classPrivateFieldGet(this, _Store_stateObject, "f")[key] == undefined) {
             log(`Store '${key}' does not exist. Returning undefined`, 'warn');
             return undefined;
@@ -604,7 +612,7 @@ class Store {
      * Delete a State from the Manager. This action is irreversible.
      * @param {string} key - Key to delete
      */
-    deleteState(key) {
+    deleteStore(key) {
         if (__classPrivateFieldGet(this, _Store_stateObject, "f")[key] == undefined) {
             log(`Store '${key}' does not exist. Therefore it cannot be deleted.`, 'warn');
         }
@@ -636,7 +644,7 @@ class Store {
                     log(`⚙️ Creating state '${state.getAttribute(attributes.get('state'))}' from page load.`, 'log');
                 const name = state.getAttribute(attributes.get('state'));
                 const value = state.getAttribute(attributes.get('state-init')) || '';
-                this.createState(name, value);
+                this.createStore(name, value);
             }
         });
     }

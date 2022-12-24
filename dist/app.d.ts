@@ -17,7 +17,6 @@ interface AtherOptions {
     debugLogging?: boolean;
     useCSSForFading?: boolean;
     disableJSNavigation?: boolean;
-    useInternalFunctionMount?: boolean;
     cssFadeOptions?: {
         fadeInCSSClass?: string;
         fadeOutCSSClass?: string;
@@ -45,7 +44,6 @@ export declare class AtherJS {
     debugLogging: boolean;
     useCSSForFading: boolean;
     private disableJSNavigation;
-    private useInternalFunctionMount;
     CSSFadeOptions: {
         fadeInCSSClass: string;
         fadeOutCSSClass: string;
@@ -55,6 +53,7 @@ export declare class AtherJS {
         fadeFooter: boolean;
     };
     stateOptions: StoreOptions;
+    private pageScript;
     private animator;
     private store;
     private isNavigating;
@@ -116,6 +115,7 @@ export declare class AtherJS {
      * @param {boolean} playAnims - Whether or not to play animations
      */
     private navigate;
+    private loadPageScript;
     /**
      * Request a page and return its body
      * @param {string} url - URL to request

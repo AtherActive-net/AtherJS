@@ -17,7 +17,6 @@ interface AtherOptions {
     debugLogging?: boolean
     useCSSForFading?: boolean
     disableJSNavigation?: boolean
-    useInternalFunctionMount?: boolean
     cssFadeOptions?: {
         fadeInCSSClass?: string
         fadeOutCSSClass?: string
@@ -39,9 +38,9 @@ interface StoreOptions {
 }
 
 const attributes = new Map<string,string>([
-    ['state', 'at-state'],
-    ['state-value', 'at-state-value'],
-    ['state-init', 'at-state-initial'],
+    ['state', 'at-store'],
+    ['state-value', 'at-store-value'],
+    ['state-init', 'at-store-initial'],
     ['ignore', 'at-ignore'],
     ['back', 'at-back'],
     ['link', 'at-link'],
@@ -70,7 +69,6 @@ export class AtherJS {
     public debugLogging: boolean = false;
     public useCSSForFading: boolean = false;
     private disableJSNavigation:boolean = true;
-    private useInternalFunctionMount: boolean = false;
     public CSSFadeOptions: {
         fadeInCSSClass: string,
         fadeOutCSSClass: string
@@ -82,6 +80,8 @@ export class AtherJS {
     public stateOptions: StoreOptions = {
         updateElementListOnUpdate: true,
     }
+
+    private pageScript: Object;
 
     private animator = new Anims();
     private store: Store;
@@ -99,7 +99,6 @@ export class AtherJS {
         bodyOverwrite: 'body',
         debugLogging: false,
         useCSSForFading: false,
-        useInternalFunctionMount: false,
         cssFadeOptions: {
             fadeInCSSClass: 'fadeIn',
             fadeOutCSSClass: 'fadeOut'
@@ -313,6 +312,7 @@ export class AtherJS {
         } catch (e) {
             log(`❌ Failed to configure links and forms: ${e}`, 'error');
         }
+
         // Finally, we update all elements referencing State
         this.store.reloadState();
         this.hookEvents();
@@ -320,11 +320,25 @@ export class AtherJS {
         // And in the end we fade in the new page.
         if(playAnims)await this.animator.fadeIn(document.body.querySelector(this.body) as HTMLElement)
         document.dispatchEvent(new CustomEvent('atherjs:pagechange'))
+
         // Store the URL in the History array. We cut off the arguments as it may cause issues and generally is not needed.
         this.urlHistory.push(url.split('?')[0]);
         this.isNavigating = false;
 
+        // Update the script references
+        await this.loadPageScript();
+    }
 
+    private async loadPageScript() {
+        const script = document.querySelector('script:not([src])') as HTMLScriptElement;
+        if(script == null) return;
+
+        // We encode the script to make it work with import()
+        const encoded = encodeURIComponent(script.innerHTML);
+        const uri = `data:text/javascript;charset=utf-8,${encoded}`;
+
+        const imports = await import(uri)
+        this.pageScript = await imports;
     }
 
     /**
@@ -543,11 +557,7 @@ export class AtherJS {
         element.addEventListener(attribute, (e) => {
             if(element.hasAttribute(attributes.get('prevent'))) e.preventDefault();
             const functionName = element.getAttribute(attributes.get(fetchAttribute));
-            if(this.useInternalFunctionMount) {
-                this.pageCache[functionName](element,e);
-                return;
-            }
-            window[functionName](element,e);
+            this.pageScript[functionName](element,e);
         })
     }
 
@@ -635,11 +645,11 @@ class Store {
      * @param {string} key - Key to set
      * @param {any} value - Value to set
      */
-    public setState(key:string,value:any) {
+    public setStore(key:string,value:any) {
         if(this.#stateObject[key] == undefined) {
             log(`Store key '${key}' does not exist. Creating it..`, 'warn');
             log('Stores should be created manually before setting values.', 'warn');
-            this.createState(key, value)
+            this.createStore(key, value)
         }
         this.#stateObject[key].value = value;
 
@@ -653,7 +663,7 @@ class Store {
      * @param {string} name - Name of the state
      * @param {any} value - Initial value of the state
      */
-    public createState(name:string,value:any) {
+    public createStore(name:string,value:any) {
         this.#stateObject[name] = new StateObject(name,value);
     }
 
@@ -662,7 +672,7 @@ class Store {
      * @param {string} key - Key to get
      * @returns value of the key
      */
-    public getState(key:string) {
+    public getStore(key:string) {
         if(this.#stateObject[key] == undefined) {
             log(`Store '${key}' does not exist. Returning undefined`, 'warn');
             return undefined;
@@ -674,7 +684,7 @@ class Store {
      * Delete a State from the Manager. This action is irreversible.
      * @param {string} key - Key to delete
      */
-    public deleteState(key:string) {
+    public deleteStore(key:string) {
         if(this.#stateObject[key] == undefined) {
             log(`Store '${key}' does not exist. Therefore it cannot be deleted.`, 'warn');
         }
@@ -708,7 +718,7 @@ class Store {
                 if(this.debugLogging) log(`⚙️ Creating state '${state.getAttribute(attributes.get('state'))}' from page load.`, 'log');
                 const name = state.getAttribute(attributes.get('state'));
                 const value = state.getAttribute(attributes.get('state-init')) || '';
-                this.createState(name,value);
+                this.createStore(name,value);
             }
         })
     }

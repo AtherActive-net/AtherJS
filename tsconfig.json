@@ -10,7 +10,7 @@
 		"baseUrl": "./src",
 		"lib": ["ES2021", "DOM"],
 		"declaration": true,
-		"module": "ES2015",
+		"module": "ES2020",
 	},
 	"include": ["src/"]
 }
