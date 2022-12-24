@@ -557,7 +557,12 @@ export class AtherJS {
         element.addEventListener(attribute, (e) => {
             if(element.hasAttribute(attributes.get('prevent'))) e.preventDefault();
             const functionName = element.getAttribute(attributes.get(fetchAttribute));
-            this.pageScript[functionName](element,e);
+
+            try {
+                this.pageScript[functionName](element,e);
+            } catch(e) {
+                log(`Error: ${e.message} in ${functionName}()`, 'error')
+            }
         })
     }
 
