@@ -38,11 +38,11 @@ export class Store {
      * @param {string} key - Key to set
      * @param {any} value - Value to set
      */
-    public setStore(key:string,value:any) {
+    public set(key:string,value:any) {
         if(this.#stateObject[key] == undefined) {
             log(`Store key '${key}' does not exist. Creating it..`, 'warn');
             log('Stores should be created manually before setting values.', 'warn');
-            this.createStore(key, value)
+            this.create(key, value)
         }
         this.#stateObject[key].value = value;
 
@@ -56,7 +56,7 @@ export class Store {
      * @param {string} name - Name of the state
      * @param {any} value - Initial value of the state
      */
-    public createStore(name:string,value:any) {
+    public create(name:string,value:any) {
         this.#stateObject[name] = new StateObject(name,value);
     }
 
@@ -65,7 +65,7 @@ export class Store {
      * @param {string} key - Key to get
      * @returns value of the key
      */
-    public getStore(key:string) {
+    public get(key:string) {
         if(this.#stateObject[key] == undefined) {
             log(`Store '${key}' does not exist. Returning undefined`, 'warn');
             return undefined;
@@ -77,7 +77,7 @@ export class Store {
      * Delete a State from the Manager. This action is irreversible.
      * @param {string} key - Key to delete
      */
-    public deleteStore(key:string) {
+    public delete(key:string) {
         if(this.#stateObject[key] == undefined) {
             log(`Store '${key}' does not exist. Therefore it cannot be deleted.`, 'warn');
         }
@@ -111,7 +111,7 @@ export class Store {
                 if(this.debugLogging) log(`⚙️ Creating state '${state.getAttribute(attributes.get('state'))}' from page load.`, 'log');
                 const name = state.getAttribute(attributes.get('state'));
                 const value = state.getAttribute(attributes.get('state-init')) || '';
-                this.createStore(name,value);
+                this.create(name,value);
             }
         })
     }
