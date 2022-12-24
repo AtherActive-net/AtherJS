@@ -2,10 +2,14 @@
   "name": "atherjs",
   "version": "0.1.0",
   "description": "A small library to make any Static Site feel like a modern SPA.",
-  "main": "dist/app.js",
+  "main": "bundle/ather.js",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/AtherActive-net/AtherJS.git"
+  },
+  "scripts": {
+    "build-prod": "node_modules/webpack-cli/bin/cli.js --mode production",
+    "build-dev": "node_modules/webpack-cli/bin/cli.js --watch"
   },
   "keywords": [],
   "author": "ATHER",
@@ -16,6 +20,7 @@
   "homepage": "https://atherdev.nl/",
   "module": "dist/app.js",
   "devDependencies": {
-    "ts-loader": "^9.4.1"
+    "ts-loader": "^9.4.1",
+    "webpack-cli": "^5.0.1"
   }
 }
