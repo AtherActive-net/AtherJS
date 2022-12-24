@@ -441,6 +441,9 @@ export class AtherJS {
         return link.href.includes('http')
     }
 
+    /**
+     * Find elements that use our customEvent attributes and bind them to the event.
+     */
     private hookEvents() {
         const elements = document.querySelectorAll(`[${attributes.get('onchange')}],[${attributes.get('onclick')}],[${attributes.get('oninput')}],[${attributes.get('onkeydown')}],[${attributes.get('onkeyup')}],[${attributes.get('onkeypress')}],[${attributes.get('onsubmit')}]
         `)

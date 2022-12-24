@@ -103,5 +103,5 @@ typings/
 .tern-port
 
 /test
-/dist
 /bundle
+/dist

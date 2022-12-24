@@ -20,6 +20,10 @@ export function log(msg:string , type:string="log") {
     }
 }
 
+/**
+ * A Map of all attributes used by AtherJS.
+ * We store this here as a map to make it easier to change the attribute names if ever needed.
+ */
 export const attributes = new Map<string,string>([
     ['state', 'at-store'],
     ['state-value', 'at-store-value'],
