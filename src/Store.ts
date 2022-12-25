@@ -104,7 +104,7 @@ export class Store {
     private createOnLoad() {
         if(!this.createStatesOnPageLoad) return;
 
-        const states = document.querySelectorAll('[ather-state]');
+        const states = document.querySelectorAll(attributes.get('state'));
 
         states.forEach((state:HTMLElement) => {
             if(this.#stateObject[state.getAttribute(attributes.get('state'))] == undefined) {
