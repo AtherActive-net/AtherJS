@@ -34,6 +34,11 @@ export const attributes = new Map<string,string>([
     ['namespace', 'at-namespace'],
     ['rebuild', 'at-rebuild'],
 
+    ['pagestate', 'at-var'],
+    ['pagestate-value', 'at-var-value'],
+    ['pagestate-init', 'at-var-initial'],
+    
+
     // Overwrites
     ['onsubmit', 'at-onsubmit'],
     ['onchange', 'at-onchange'],

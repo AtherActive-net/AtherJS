@@ -7,10 +7,12 @@ export class StateObject {
     private name:string;
     private value:any;
     private referencedElements:HTMLElement[] = [];
+    public prefix:string = '';
 
-    constructor(name:string, value:any) {
+    constructor(name:string, value:any, prefix:string='') {
         this.name = name;
         this.value = value;
+        this.prefix = prefix;
         this.findElements();
         this.updateElements();
     }
@@ -19,7 +21,7 @@ export class StateObject {
      * Find all elements that reference this state
      */
     public findElements() {
-        const attribute = attributes.get('state');
+        const attribute = attributes.get(this.prefix+'state');
         this.referencedElements = Array.from(document.querySelectorAll(`[${attribute}="${this.name}"]`));
     }
 
@@ -28,9 +30,9 @@ export class StateObject {
      */
     public updateElements() {
         this.referencedElements.forEach((el) => {
-            if(el.getAttribute(attributes.get('state-value'))) {
-                const key = el.getAttribute(attributes.get('state'));
-                const value = el.getAttribute(attributes.get('state-value'));
+            if(el.getAttribute(attributes.get(this.prefix+'state-value'))) {
+                const key = el.getAttribute(attributes.get(this.prefix+'state'));
+                const value = el.getAttribute(attributes.get(this.prefix+'state-value'));
                 if(!value) {
                     log(`No value value requested by element.`, 'warn');
                     return;

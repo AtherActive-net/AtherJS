@@ -1,6 +1,7 @@
-import { AtherOptions } from './interfaces.js';
+import { AtherOptions, StoreOptions } from './interfaces.js';
 import { log,attributes } from './utils.js';
 import { StateObject } from './StoreOptions.js';
+import { AtherJS } from 'app.js';
 
 /**
  * State class. Deals with anyting related to state.
@@ -9,21 +10,16 @@ export class Store {
     private debugLogging:boolean
     private createStatesOnPageLoad:boolean = true;
     private updateElementListOnUpdate:boolean = true;
+    public prefix:string = '';
     
     #stateObject:object = {};
 
-    constructor(opts:AtherOptions={
-        debugLogging: false,
-        store: {
-            createStatesOnPageLoad: true,
-            updateElementListOnUpdate: true,
-        }
-    }) {
-        this.debugLogging = opts.debugLogging;
+    constructor(ather:AtherJS, opts:StoreOptions={}) {
+        this.debugLogging = ather.debugLogging;
 
         // load options for state
-        Object.keys(opts.store).forEach((key) => {
-            this[key] = opts.store[key];
+        Object.keys(opts).forEach((key) => {
+            this[key] = opts[key];
         })
 
         if(this.createStatesOnPageLoad){
@@ -57,7 +53,7 @@ export class Store {
      * @param {any} value - Initial value of the state
      */
     public create(name:string,value:any) {
-        this.#stateObject[name] = new StateObject(name,value);
+        this.#stateObject[name] = new StateObject(name,value,this.prefix);
     }
 
     /**
@@ -104,13 +100,13 @@ export class Store {
     private createOnLoad() {
         if(!this.createStatesOnPageLoad) return;
 
-        const states = document.querySelectorAll(attributes.get('state'));
+        const states = document.querySelectorAll(attributes.get(this.prefix+'state'));
 
         states.forEach((state:HTMLElement) => {
-            if(this.#stateObject[state.getAttribute(attributes.get('state'))] == undefined) {
-                if(this.debugLogging) log(`⚙️ Creating state '${state.getAttribute(attributes.get('state'))}' from page load.`, 'log');
-                const name = state.getAttribute(attributes.get('state'));
-                const value = state.getAttribute(attributes.get('state-init')) || '';
+            if(this.#stateObject[state.getAttribute(attributes.get(this.prefix+'state'))] == undefined) {
+                if(this.debugLogging) log(`⚙️ Creating state '${state.getAttribute(attributes.get(this.prefix+'state'))}' from page load.`, 'log');
+                const name = state.getAttribute(attributes.get(this.prefix+'state'));
+                const value = state.getAttribute(attributes.get(this.prefix+'state-init')) || '';
                 this.create(name,value);
             }
         })

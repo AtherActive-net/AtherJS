@@ -2,6 +2,11 @@
 A Store is a globally stored variable. It can only contain numbers and strings.
 It is useful for data that should be stored globally, but also for anything that you want to be able to render in the UI.
 
+## Page Store vs Global Store
+There are 2 Stores active at all time. These are the `page` and the `store`. The `page` store will NOT be transferred to other pages, while the `store` will. You can access the `page` store by using `ather.page`, and the `store` by using `ather.store`.
+
+On this page we will be using the `store` store, however the `page` store works in the same way and you can swap the `store` for `page` in the examples below if you want to use the `page` store.
+
 ## Creating a store
 This step is optional, but recommended. You can easily create a store by doing this:
 ```ts

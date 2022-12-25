@@ -28,6 +28,7 @@ export class AtherJS {
 
     private animator = new Anims();
     private store: Store;
+    private page: Store;
     private isNavigating: boolean
     public pageCache: Object = {};
     private activeScriptNameStates: string[] = [];
@@ -67,7 +68,7 @@ export class AtherJS {
         })
 
         // Create a new State object
-        this.store = new Store();
+        this.store = new Store(this);
         this.isNavigating = false;
 
         // Disable JS navigation if needed
@@ -263,6 +264,9 @@ export class AtherJS {
         // And in the end we fade in the new page.
         if(playAnims)await this.animator.fadeIn(document.body.querySelector(this.body) as HTMLElement)
         document.dispatchEvent(new CustomEvent('atherjs:pagechange'))
+
+        // Refresh the page Store
+        this.page = new Store(this, {prefix: 'page'});
 
         // Store the URL in the History array. We cut off the arguments as it may cause issues and generally is not needed.
         this.urlHistory.push(url.split('?')[0]);

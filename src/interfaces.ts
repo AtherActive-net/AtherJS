@@ -34,5 +34,6 @@ export interface AtherOptions {
  */
 export interface StoreOptions {
     updateElementListOnUpdate?: boolean,
-    createStatesOnPageLoad?: boolean
+    createStatesOnPageLoad?: boolean,
+    prefix?: string
 }
