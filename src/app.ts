@@ -86,7 +86,9 @@ export class AtherJS {
      * @returns void
      */
     private disableJsNav(): void {
-        history.back=()=>{};
+        history.back = () => {
+            this.back();
+        }
         history.forward=()=>{};
         history.go=()=>{};
     }
