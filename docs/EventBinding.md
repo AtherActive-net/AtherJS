@@ -18,10 +18,10 @@ For this example we will add an `oninput` event to an input element. This will u
 
 ```html
 {# Your HTML file #}
-<p at-store="field"></p>
+<p at-var="field"></p>
 <input type="text" at-oninput="inputUpdated">
 ```
-We need some basic HTML to start with. We have a paragraph element with the `at-store` attribute, and an input element with the `at-oninput` attribute. Now, let's add some JS to make this happen.
+We need some basic HTML to start with. We have a paragraph element with the `at-var` attribute, and an input element with the `at-oninput` attribute. Now, let's add some JS to make this happen.
 
 ```js
 // NOTE: This MUST be in the <script> tag that is EMBEDDED in the HTML file.
@@ -30,8 +30,9 @@ We need some basic HTML to start with. We have a paragraph element with the `at-
 const ather = window.ather;
 
 // Here we export the function that will be called when the input is updated.
+// Note that the function is taking 2 arguments. This is because we provide the Element and the Event.
 export function inputUpdated(element,event) {
-    ather.store.set('field',element.value);
+    ather.page.set('field',element.value);
 }
 ```
 
