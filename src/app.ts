@@ -286,8 +286,10 @@ export class AtherJS {
         const encoded = encodeURIComponent(script.innerHTML);
         const uri = `data:text/javascript;charset=utf-8,${encoded}`;
 
-        const imports = await import(uri)
-        this.pageScript = await imports;
+        // We MUST ignore this import for WebPack as it will try to bundle it
+        // Bundling is obivously not possible as it is attempting to load something we dont know beforehand.
+        const importedScript = await import( /* webpackIgnore: true */uri)
+        this.pageScript = await importedScript;
     }
 
     /**
