@@ -278,6 +278,10 @@ export class AtherJS {
         await this.loadPageScript();
     }
 
+    /**
+     * Load the embedded script from the page. Then import and mount it to AtherJS.
+     * We also execute the onLoad function if it exists.
+     */
     private async loadPageScript() {
         const script = document.querySelector('script:not([src])') as HTMLScriptElement;
         if(script == null) return;
@@ -290,6 +294,9 @@ export class AtherJS {
         // Bundling is obivously not possible as it is attempting to load something we dont know beforehand.
         const importedScript = await import( /* webpackIgnore: true */uri)
         this.pageScript = await importedScript;
+        
+        // If the script contains an onLoad function, we will execute it.
+        if(this.pageScript['onLoad'] != null) this.pageScript['onLoad']();
     }
 
     /**
