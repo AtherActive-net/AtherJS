@@ -22,7 +22,7 @@ export class StateObject {
      */
     public findElements() {
         const attribute = attributes.get(this.prefix+'state');
-        this.referencedElements = Array.from(document.querySelectorAll(`[${attribute}="${this.name}"]`));
+        this.referencedElements = Array.from(document.querySelectorAll(`[${attribute}^="${this.name}"]`));
     }
 
     /**
@@ -44,7 +44,21 @@ export class StateObject {
                     log(`Value '${value}' does not exist on state '${key}'.`, 'warn');
                 }
             } else {
-                el.innerHTML = this.value;
+                const key = el.getAttribute(attributes.get(this.prefix+'state'));
+                
+                // Attempt to get the proper value. This is needed for nested objects.
+                // If the key is not nested, it will just return it.
+                // Arrays are currently not yet supported.
+                const splittedKey = key.split('.');
+                let value = this.value;
+                splittedKey.forEach(splitKey => {
+                    if(splitKey == splittedKey[0]) return
+
+                    value = value[splitKey];
+                });
+
+                // Return the value that we got.
+                el.innerHTML = value;
             }
         })
     }
