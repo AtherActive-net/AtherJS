@@ -49,17 +49,35 @@ export class StateObject {
                 // Attempt to get the proper value. This is needed for nested objects.
                 // If the key is not nested, it will just return it.
                 // Arrays are currently not yet supported.
-                const splittedKey = key.split('.');
-                let value = this.value;
-                splittedKey.forEach(splitKey => {
-                    if(splitKey == splittedKey[0]) return
-
-                    value = value[splitKey];
-                });
+                let value = this.assembleValue(key);
+                
+                // Check if the value is actually defined. If not, log a warning.
+                // We will actually render the undefined value though.
+                if(value == undefined) {
+                    log(`Value '${key}' does not exist on store '${this.name}'.`, 'warn');
+                }
 
                 // Return the value that we got.
                 el.innerHTML = value;
             }
         })
+    }
+
+    /**
+     * Assemble the value of a Store. 
+     * We loop over the entire key, and we will find our way through the object if there is a dot in the key.
+     * @param {string} key - Key received from the element
+     * @returns value of the key
+     */
+    private assembleValue(key: string) {
+        const splittedKey = key.split('.');
+        let value = this.value;
+        splittedKey.forEach(splitKey => {
+            if (splitKey == splittedKey[0])
+                return;
+
+            value = value[splitKey];
+        });
+        return value;
     }
 }
