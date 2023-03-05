@@ -297,6 +297,7 @@ export class AtherJS {
         
         // If the script contains an onLoad function, we will execute it.
         if(this.pageScript['onLoad'] != null) this.pageScript['onLoad']();
+        if(this.pageScript['onFetch'] != null) this.pageScript['onFetch']();
     }
 
     /**
