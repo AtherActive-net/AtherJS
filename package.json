@@ -20,6 +20,7 @@
   "homepage": "https://atherdev.nl/",
   "module": "dist/app.js",
   "devDependencies": {
+    "prettier": "^3.0.1",
     "ts-loader": "^9.4.1",
     "webpack-cli": "^5.0.1"
   }

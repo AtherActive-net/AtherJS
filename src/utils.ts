@@ -51,3 +51,13 @@ export const attributes = new Map<string,string>([
     // prevent
     ['prevent', 'at-prevent'],
 ])
+
+export class ComponentFetchError extends Error {
+    public status:number = 404;
+
+    constructor(message:string, status:number=404) {
+        super(message);
+        this.name = 'ComponentFetchError';
+        this.status = status;
+    }
+}

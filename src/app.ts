@@ -1,5 +1,5 @@
 import { AtherOptions, StoreOptions } from './interfaces.js';
-import { log,attributes } from './utils.js';
+import { log,attributes, ComponentFetchError } from './utils.js';
 import { Store } from './Store.js';
 import { Anims } from './Anims.js';
 
@@ -23,6 +23,7 @@ export class AtherJS {
     public stateOptions: StoreOptions = {
         updateElementListOnUpdate: true,
     }
+    public componentsMountFolder: string = '/components';
 
     private pageScript: Object;
 
@@ -33,6 +34,7 @@ export class AtherJS {
     public pageCache: Object = {};
     private activeScriptNameStates: string[] = [];
     private urlHistory: string[] = [];
+    private templateCache = new Map<string, string>();
 
     /**
      * AtherJS Constructor
@@ -250,6 +252,8 @@ export class AtherJS {
         
         // update the URL at the top of the browser
         window.history.pushState({}, '', url);
+
+        await this.findComponents();
 
         // Configure links and forms to work with AtherJS
         try {
@@ -526,6 +530,66 @@ export class AtherJS {
                 log(`Error: ${e.message} in ${functionName}()`, 'error')
             }
         })
+    }
+
+    private async findComponents() {
+        const components = document.querySelectorAll('at-component[name]');
+
+
+        components.forEach((component) => {
+            const name = component.getAttribute('name');
+            this.fetchComponent(name).then((data) => {
+                // component.insertBefore(data, component.firstChild);
+                component.innerHTML = '';
+                component.appendChild(data);
+            })
+        });
+
+    }
+
+    private async fetchComponent(componentName:string) {
+        let data;
+        if(this.templateCache.has(componentName)) {
+            
+            data = this.templateCache.get(componentName);
+            if(!data) return this.handleComponentError(componentName, new ComponentFetchError('Not Found', 404));
+
+        } else {
+
+            const response = await fetch(`${this.componentsMountFolder}/${componentName}.html`, {});
+            if(response.status !== 200) {
+                this.templateCache.set(componentName, null);
+                return this.handleComponentError(componentName, new ComponentFetchError(response.statusText, response.status));
+            }
+            data = await response.text();
+            this.templateCache.set(componentName, data);
+
+        }
+        const template = document.createElement('template');
+        template.innerHTML = data;
+        const content = template.content.firstChild;
+
+        return content
+    }
+
+    // Create an eror message if something goes wrong
+    private handleComponentError(componentName:string, error:ComponentFetchError) {
+        const errorSpan = document.createElement('div');
+        errorSpan.setAttribute('style', `
+            border: 2px solid darkred;
+            border-radius: 24px;
+            background-color: rgb(240, 240, 240);
+            font-family: sans-serif;
+            padding: 24px;
+            margin: 12px;
+        `)
+
+        errorSpan.innerHTML = `
+        <strong>Somehting went wrong loading '${componentName}': ${error.status}</strong> <br>
+        <span style="font-size: 14px">Check the console for more information.</span>
+        <pre>${error.stack}</pre>
+        `;
+        return errorSpan;
     }
 
 }
