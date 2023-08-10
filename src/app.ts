@@ -388,9 +388,10 @@ export class AtherJS {
             if(script.src) newScript.src = script.src;
             if(script.hasAttribute("at-component-uuid")) 
                 newScript.setAttribute("at-component-uuid", script.getAttribute("at-component-uuid") as string)
-                
-            basePage.appendChild(newScript);
+            
+            script.parentElement.appendChild(newScript);
             if(this.debugLogging) log(`📜 Running script ${script.src} ('${identifier}')`)
+            script.remove();
         })
     }
 
@@ -564,9 +565,10 @@ export class AtherJS {
 
 
                 const script = pushData.querySelector('script')
-
                 script?.setAttribute('at-component-uuid', uuid)
                 script?.setAttribute('at-namespace', `${name}_${uuid}`)
+
+                pushData = this.processComponentStyles(pushData);
             }
 
             await this.findComponents(pushData);
@@ -618,6 +620,20 @@ export class AtherJS {
         <pre>${error.stack}</pre>
         `;
         return errorSpan;
+    }
+
+    public processComponentStyles(component:Element) {
+        const style = component.querySelector('style');
+        const uuid = component.getAttribute('at-component-uuid');
+
+        if(style) {
+            const content = style.innerHTML;
+            style.innerHTML = content.replaceAll("&", `.at-component-${uuid} `)
+
+            component.classList.add(`at-component-${uuid}`)
+        }
+
+        return component;
     }
 
     public getComponent(activeScript:Element) {
