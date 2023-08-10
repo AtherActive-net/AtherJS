@@ -386,7 +386,9 @@ export class AtherJS {
             window['at-script-cache']['${identifier}']();
             `
             if(script.src) newScript.src = script.src;
-            if(script.hasAttribute("at-component-uuid")) newScript.setAttribute("at-component-uuid", script.getAttribute("at-component-uuid") as string)
+            if(script.hasAttribute("at-component-uuid")) 
+                newScript.setAttribute("at-component-uuid", script.getAttribute("at-component-uuid") as string)
+                
             basePage.appendChild(newScript);
             if(this.debugLogging) log(`📜 Running script ${script.src} ('${identifier}')`)
         })
