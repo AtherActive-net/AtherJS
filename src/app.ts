@@ -240,12 +240,14 @@ export class AtherJS {
         // Cleanup and render the page
         this.cleanPage(body);
 
+        await this.findComponents();
+
         // We reload link elements to allow scripts to create objects that require these styles.
         this.reloadLinkElements(body);
 
         try {
             this.destroyJSCache();
-            this.executeJS(body);    
+            this.executeJS(document.body.querySelector(this.body) as HTMLElement);    
         } catch (e) {
             log(`❌ Failed to execute JS: ${e}`, 'error');
         }
@@ -253,7 +255,6 @@ export class AtherJS {
         // update the URL at the top of the browser
         window.history.pushState({}, '', url);
 
-        await this.findComponents();
 
         // Configure links and forms to work with AtherJS
         try {
@@ -353,6 +354,10 @@ export class AtherJS {
      * @param {HTMLElement} body - The new page's body to take the scripts from.
      */
     private executeJS(body:HTMLElement) {
+        // Initialize the script cache if it does not exist
+        if(!window['at-script-cache']) window['at-script-cache'] = {};
+
+        if(this.debugLogging) log(`📜 Executing JS scripts`);
         const scripts = body.querySelectorAll('script');
         const basePage = document.body.querySelector(this.body);
         scripts.forEach((script) => {
@@ -370,10 +375,18 @@ export class AtherJS {
                 // Add the script to the list of active scripts
                 this.activeScriptNameStates.push(identifier);
             }
+
             // Embed the script to the page. Also makes it execute.
             const newScript = document.createElement('script');
-            newScript.innerHTML = script.innerHTML;
-            newScript.src = script.src;
+
+            // This may look odd, but we actually have to wrap it in a function
+            // otherwise unloading it will not work.
+            newScript.innerHTML = `
+            window['at-script-cache']['${identifier}'] = () => {${script.innerHTML}};
+            window['at-script-cache']['${identifier}']();
+            `
+            if(script.src) newScript.src = script.src;
+            if(script.hasAttribute("at-component-uuid")) newScript.setAttribute("at-component-uuid", script.getAttribute("at-component-uuid") as string)
             basePage.appendChild(newScript);
             if(this.debugLogging) log(`📜 Running script ${script.src} ('${identifier}')`)
         })
@@ -385,7 +398,7 @@ export class AtherJS {
     private destroyJSCache() {
         this.activeScriptNameStates.forEach((scriptName) => {
             if(this.debugLogging) log(`🗑️ Destroying script '${scriptName}' from cache`);
-            delete window[scriptName];
+            delete window['at-script-cache'][scriptName];
         })
         this.activeScriptNameStates = [];
     }
@@ -532,25 +545,37 @@ export class AtherJS {
         })
     }
 
-    private async findComponents() {
-        const components = document.querySelectorAll('at-component[name]');
+    private async findComponents(element:Element | HTMLElement=document.body) {
+        const components = element.querySelectorAll('at-component[name]');
 
-
-        components.forEach((component) => {
+        for(let i = 0; i < components.length; i++) {
+            const component = components.item(i);
             const name = component.getAttribute('name');
-            this.fetchComponent(name).then((data) => {
-                // component.insertBefore(data, component.firstChild);
-                component.innerHTML = '';
-                component.appendChild(data);
-            })
-        });
+            const data = await this.fetchComponent(name);
 
+            let pushData = data;
+            if(data.id != 'at-error-view') {
+                pushData = data.firstElementChild
+                pushData.setAttribute('at-component', name);
+                const uuid = Math.random().toString(36).substring(7)
+                pushData.setAttribute('at-component-uuid', uuid);
+
+
+                const script = pushData.querySelector('script')
+
+                script?.setAttribute('at-component-uuid', uuid)
+                script?.setAttribute('at-namespace', `${name}_${uuid}`)
+            }
+
+            await this.findComponents(pushData);
+            component.parentElement.replaceChild(pushData, component);
+        }
     }
 
     private async fetchComponent(componentName:string) {
-        let data;
+        let data:string;
         if(this.templateCache.has(componentName)) {
-            
+
             data = this.templateCache.get(componentName);
             if(!data) return this.handleComponentError(componentName, new ComponentFetchError('Not Found', 404));
 
@@ -567,19 +592,20 @@ export class AtherJS {
         }
         const template = document.createElement('template');
         template.innerHTML = data;
-        const content = template.content.firstChild;
+        const content = template.content.firstElementChild;
 
         return content
     }
 
-    // Create an eror message if something goes wrong
     private handleComponentError(componentName:string, error:ComponentFetchError) {
         const errorSpan = document.createElement('div');
+        errorSpan.id = 'at-error-view';
         errorSpan.setAttribute('style', `
             border: 2px solid darkred;
             border-radius: 24px;
             background-color: rgb(240, 240, 240);
             font-family: sans-serif;
+            color: black;
             padding: 24px;
             margin: 12px;
         `)
@@ -590,6 +616,12 @@ export class AtherJS {
         <pre>${error.stack}</pre>
         `;
         return errorSpan;
+    }
+
+    public getComponent(activeScript:Element) {
+        const uuid = activeScript.getAttribute('at-component-uuid');
+        const component = document.querySelector(`[at-component-uuid="${uuid}"]`)
+        return component;
     }
 
 }
