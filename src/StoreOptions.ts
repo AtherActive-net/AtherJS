@@ -29,6 +29,10 @@ export class StateObject {
      * Update all elements that reference this state
      */
     public updateElements() {
+        // send out a custom event
+        const event = new CustomEvent('atherjs:state-update', { detail: { name: this.name, value: this.value, prefix: this.prefix } });
+        document.dispatchEvent(event);
+
         this.referencedElements.forEach((el) => {
             if(el.getAttribute(attributes.get(this.prefix+'state-value'))) {
                 const key = el.getAttribute(attributes.get(this.prefix+'state'));

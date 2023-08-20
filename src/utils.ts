@@ -47,6 +47,14 @@ export const attributes = new Map<string,string>([
     ['onkeydown', 'at-onkeydown'],
     ['onkeyup', 'at-onkeyup'],
     ['onkeypress', 'at-onkeypress'],
+
+    // for
+    ['foreach', 'at-foreach'],
+    ['each', 'at-each'],
+
+    // component
+    ['component', 'at-component'],
+    ['component-uuid', 'at-component-uuid'],
     
     // prevent
     ['prevent', 'at-prevent'],
@@ -60,4 +68,16 @@ export class ComponentFetchError extends Error {
         this.name = 'ComponentFetchError';
         this.status = status;
     }
+}
+
+export function assembleValue(key: string, variable:any) {
+    const splittedKey = key.split('.');
+    let value = variable;
+    splittedKey.forEach(splitKey => {
+        if (splitKey == splittedKey[0])
+            return;
+
+        value = value?.[splitKey];
+    });
+    return value;
 }

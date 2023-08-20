@@ -1,7 +1,10 @@
 import { AtherOptions, StoreOptions } from './interfaces.js';
-import { log,attributes, ComponentFetchError } from './utils.js';
+import { log,attributes, ComponentFetchError, assembleValue } from './utils.js';
 import { Store } from './Store.js';
 import { Anims } from './Anims.js';
+import { ComponentFunctions } from './component.js';
+
+export { Store } from './Store.js';
 
 /**
  * AtherJS base class. Contains all functionality and hooks
@@ -35,6 +38,7 @@ export class AtherJS {
     private activeScriptNameStates: string[] = [];
     private urlHistory: string[] = [];
     private templateCache = new Map<string, string>();
+    private componentFunctions = new ComponentFunctions();
 
     /**
      * AtherJS Constructor
@@ -76,10 +80,39 @@ export class AtherJS {
         // Disable JS navigation if needed
         if(this.disableJSNavigation) this.disableJsNav();
 
+        this.initializeGlobalEventHandlers();
+
         log('✅ AtherJS is active!');
         document.addEventListener('DOMContentLoaded', () => {
             this.go(window.location.href,false);
         })
+    }
+
+    /**
+     * Intit the global event handlers for AtherJS
+     */
+    private initializeGlobalEventHandlers() {
+        const callback = (e:CustomEvent) => {
+            const loops = document.body.querySelectorAll(`[${attributes.get('foreach')}]`);
+            loops.forEach((loop) => {
+                //@ts-ignore
+                if(loop.getAttribute(attributes.get('foreach')) == e.detail.name) this.runLoop(loop,true);
+                if(
+                    loop.getAttribute(attributes.get('foreach')).substring(2) == e.detail.name
+                    && loop.getAttribute('at-foreach-uuid') == e.detail.prefix
+                ) 
+                    this.runLoop(loop,true);
+            })
+        }
+
+        document.addEventListener('atherjs:navigate', () => {
+            document.removeEventListener('atherjs:state-update', callback)
+        })
+        document.addEventListener('atherjs:navigate-complete', () => {
+            this.hookEvents();
+            document.addEventListener('atherjs:state-update', callback)
+        })
+        document.addEventListener('atherjs:state-update', callback)
     }
 
     /**
@@ -233,12 +266,16 @@ export class AtherJS {
      */
     private async navigate(url:string,playAnims:boolean=true) {
         // WE start with a fade animation
+        document.dispatchEvent(new CustomEvent('atherjs-navigates'));
         if(playAnims) await this.animator.fadeOut(document.body.querySelector(this.body) as HTMLElement)
         const pageData = await this.requestPage(url);
         const body = await this.parsePage(pageData as string);
         
         // Cleanup and render the page
         this.cleanPage(body);
+
+        // Refresh the page Store
+        this.page = new Store(this, {prefix: 'page'});
 
         await this.findComponents();
 
@@ -247,7 +284,7 @@ export class AtherJS {
 
         try {
             this.destroyJSCache();
-            this.executeJS(document.body.querySelector(this.body) as HTMLElement);    
+            await this.executeJS(document.body.querySelector(this.body) as HTMLElement);    
         } catch (e) {
             log(`❌ Failed to execute JS: ${e}`, 'error');
         }
@@ -266,14 +303,6 @@ export class AtherJS {
 
         // Finally, we update all elements referencing State
         this.store.reloadState();
-        this.hookEvents();
-
-        // And in the end we fade in the new page.
-        if(playAnims)await this.animator.fadeIn(document.body.querySelector(this.body) as HTMLElement)
-        document.dispatchEvent(new CustomEvent('atherjs:pagechange'))
-
-        // Refresh the page Store
-        this.page = new Store(this, {prefix: 'page'});
 
         // Store the URL in the History array. We cut off the arguments as it may cause issues and generally is not needed.
         this.urlHistory.push(url.split('?')[0]);
@@ -281,6 +310,10 @@ export class AtherJS {
 
         // Update the script references
         await this.loadPageScript();
+        await this.runLoops()
+        // And in the end we fade in the new page.
+        if(playAnims)await this.animator.fadeIn(document.body.querySelector(this.body) as HTMLElement)
+        document.dispatchEvent(new CustomEvent('atherjs:navigate-complete'))
     }
 
     /**
@@ -288,12 +321,13 @@ export class AtherJS {
      * We also execute the onLoad function if it exists.
      */
     private async loadPageScript() {
-        const script = document.querySelector('script:not([src])') as HTMLScriptElement;
+        const script = document.querySelector('pagescript') as HTMLScriptElement;
         if(script == null) return;
 
         // We encode the script to make it work with import()
         const encoded = encodeURIComponent(script.innerHTML);
         const uri = `data:text/javascript;charset=utf-8,${encoded}`;
+        script.remove();
 
         // We MUST ignore this import for WebPack as it will try to bundle it
         // Bundling is obivously not possible as it is attempting to load something we dont know beforehand.
@@ -353,7 +387,7 @@ export class AtherJS {
      * It will run all scripts in EVAL. Be absolutely sure you trust the code!
      * @param {HTMLElement} body - The new page's body to take the scripts from.
      */
-    private executeJS(body:HTMLElement) {
+    private async executeJS(body:HTMLElement) {
         // Initialize the script cache if it does not exist
         if(!window['at-script-cache']) window['at-script-cache'] = {};
 
@@ -378,21 +412,43 @@ export class AtherJS {
 
             // Embed the script to the page. Also makes it execute.
             const newScript = document.createElement('script');
-
+            let returnData = "";
             // This may look odd, but we actually have to wrap it in a function
             // otherwise unloading it will not work.
-            newScript.innerHTML = `
-            window['at-script-cache']['${identifier}'] = () => {${script.innerHTML}};
-            window['at-script-cache']['${identifier}']();
-            `
             if(script.src) newScript.src = script.src;
             if(script.hasAttribute("at-component-uuid")) 
+                returnData = this.generateComponentScriptRetuns(script.innerHTML)
+                script.innerHTML = script.innerHTML.replaceAll("export", '')
                 newScript.setAttribute("at-component-uuid", script.getAttribute("at-component-uuid") as string)
-            
+            if(script.type) {
+                return log(`Script type ${script.type} is not supported. Please remove the 'type' attribute.`, 'error')
+            }
+
+            newScript.innerHTML = `
+            window['at-script-cache']['${identifier}'] = () => {${script.innerHTML} ${returnData}};
+            window['at-script-cache']['${identifier}']().onLoad()
+            `
+
+
             script.parentElement.appendChild(newScript);
             if(this.debugLogging) log(`📜 Running script ${script.src} ('${identifier}')`)
             script.remove();
         })
+    }
+
+    private generateComponentScriptRetuns(scriptContent:string) {
+        // match all functions that are exported. get the name of the function and the function itself
+        const matchedFunctions = scriptContent.match(/export\s+function\s+(\w+)\s*\(([^)]*)\)/g);
+        const cleanedFunctions = matchedFunctions?.map((func) => {
+            const removedExport = func.replace("export function ", "")
+            const removedParams = removedExport.replace(/\(([^)]*)\)/g, "")
+            return removedParams
+        })
+
+        const returnData = cleanedFunctions.map((func) => {
+            return `${func},`
+        })
+        return `return {${cleanedFunctions.join(',')}}`
     }
 
     /**
@@ -481,9 +537,8 @@ export class AtherJS {
      * Find elements that use our customEvent attributes and bind them to the event.
      */
     private hookEvents() {
-        const elements = document.querySelectorAll(`[${attributes.get('onchange')}],[${attributes.get('onclick')}],[${attributes.get('oninput')}],[${attributes.get('onkeydown')}],[${attributes.get('onkeyup')}],[${attributes.get('onkeypress')}],[${attributes.get('onsubmit')}]
+        const elements = document.body.querySelectorAll(`[${attributes.get('onchange')}],[${attributes.get('onclick')}],[${attributes.get('oninput')}],[${attributes.get('onkeydown')}],[${attributes.get('onkeyup')}],[${attributes.get('onkeypress')}],[${attributes.get('onsubmit')}]
         `)
-
         elements.forEach((element) => {
             this.bindElementCustomEvents(element);
         })
@@ -540,12 +595,34 @@ export class AtherJS {
             if(element.hasAttribute(attributes.get('prevent'))) e.preventDefault();
             const functionName = element.getAttribute(attributes.get(fetchAttribute));
 
-            try {
-                this.pageScript[functionName](element,e);
-            } catch(e) {
-                log(`Error: ${e.message} in ${functionName}()`, 'error')
+            if(functionName.startsWith("&.")) {
+                const parent = this.findParentComponent(element)
+                const componentUUID = parent?.getAttribute('at-component-uuid');
+                const componentName = parent?.getAttribute('at-component')
+                if(!componentUUID) return;
+
+                const replacedFunctionName = functionName.replace("&.", "");
+                try {
+                    let script = window['at-script-cache'][`${componentName}_${componentUUID}`]()
+                    const component = this.componentFunctions.getComponentByUUID(componentUUID);
+                    script[replacedFunctionName](element,e,component);
+                } catch(e) {
+                    log(`Error: ${e.message} in ${replacedFunctionName}()`, 'error')
+                }
+            } else {
+
+                try {
+                    this.pageScript[functionName](element,e);
+                } catch(e) {
+                    log(`Error: ${e.message} in ${functionName}()`, 'error')
+                }
             }
         })
+    }
+
+    private findParentComponent(element:Element):Element|undefined {
+        if(element.hasAttribute('at-component-uuid')) return element;
+        return this.findParentComponent(element.parentElement);
     }
 
     private async findComponents(element:Element | HTMLElement=document.body) {
@@ -558,6 +635,11 @@ export class AtherJS {
 
             let pushData = data;
             if(data.id != 'at-error-view') {
+                const componentName = data.getAttribute('define');
+                if(componentName != name) {
+                    component.appendChild(this.handleComponentError(name, new ComponentFetchError(`Requested component ${name} does not match ${componentName}`, 500)))
+                    continue;
+                }
                 pushData = data.firstElementChild
                 pushData.setAttribute('at-component', name);
                 const uuid = Math.random().toString(36).substring(7)
@@ -612,12 +694,13 @@ export class AtherJS {
             color: black;
             padding: 24px;
             margin: 12px;
+            text-wrap: wrap;
         `)
 
         errorSpan.innerHTML = `
         <strong>Somehting went wrong loading '${componentName}': ${error.status}</strong> <br>
-        <span style="font-size: 14px">Check the console for more information.</span>
-        <pre>${error.stack}</pre>
+        <span style="font-size: 14px">Check the console for (potentially) more information.</span>
+        <pre style="text-wrap: wrap;">${error.stack}</pre>
         `;
         return errorSpan;
     }
@@ -636,10 +719,85 @@ export class AtherJS {
         return component;
     }
 
-    public getComponent(activeScript:Element) {
-        const uuid = activeScript.getAttribute('at-component-uuid');
-        const component = document.querySelector(`[at-component-uuid="${uuid}"]`)
-        return component;
+    private async runLoops(body:Element=document.body) {
+        document.head.appendChild(document.createElement('at-loop-schemas'))
+        const loops = body.querySelectorAll(`[${attributes.get('foreach')}]`);
+        loops.forEach((loop) => {
+            this.runLoop(loop);
+        })
     }
 
+    private runLoop(loop:Element, documentUpdate:boolean=false) {
+
+        // Now why do we store the schema in the head?
+        // This is because we need some form of reference, and
+        // we can't store it in the loop itself, because it will be overwritten
+        loop = this.getLoopSchema(loop, documentUpdate) || loop;
+
+        const variable = loop.getAttribute(attributes.get('foreach'));
+        const atherVariable = this.resolveVariable(variable, loop)
+        if(!atherVariable) {
+            return;
+        }
+
+        const child = loop.firstElementChild;
+        console.log(atherVariable.length)
+        for(let i = 0; i < atherVariable.length; i++) {
+            const newChild = loop.appendChild(child.cloneNode(true)) as HTMLElement;
+            const values = newChild.querySelectorAll(`[${attributes.get('each')}]`);
+            values.forEach((each) => {
+                const value = each.getAttribute(attributes.get('each'));
+                const requestedValue = assembleValue(value, atherVariable[i]);
+                if(!requestedValue) return;
+                each.innerHTML = requestedValue;
+            })
+        }
+        child.remove();
+
+        // loop.querySelectorAll(`[${attributes.get('each')}]`).forEach((each, index) => {
+        //     const value = each.getAttribute(attributes.get('each'));
+        //     const requestedValue = assembleValue(value, atherVariable[index]);
+        //     console.log(requestedValue, index)
+        //     if(!requestedValue) return;
+        //     each.innerHTML = requestedValue;
+        // })
+    }
+
+    private resolveVariable(variable:string, element:Element) {
+        if(variable.startsWith("&.")) {
+            const parent = element.closest(`[${attributes.get('component-uuid')}]`)
+            const uuid = parent.getAttribute(attributes.get('component-uuid'));
+            const component = this.componentFunctions.getComponentByUUID(uuid);
+            element.setAttribute('at-foreach-uuid', uuid);
+
+            return component?.getStore()?.get(variable.substring(2));
+        }
+        return this.page.get(variable);
+    }
+
+    private getLoopSchema(loop:Element, documentUpdate:boolean) {
+        if(!documentUpdate) {
+            const schema = document.head.querySelector(`at-loop-schemas > [${attributes.get('foreach')}="${loop.getAttribute(attributes.get('foreach'))}"]`) as HTMLElement;
+            if(!schema) {
+                const loopSchema = loop.firstElementChild.cloneNode(true) as HTMLElement;
+                const loopSchemaElement = document.createElement('div');
+                loopSchemaElement.appendChild(loopSchema);
+                loopSchemaElement.setAttribute(attributes.get('foreach'), loop.getAttribute(attributes.get('foreach')));
+                document.head.querySelector('at-loop-schemas')?.appendChild(loopSchemaElement);
+            }
+        } else {
+            const schema = document.head.querySelector(`at-loop-schemas > [${attributes.get('foreach')}="${loop.getAttribute(attributes.get('foreach'))}"]`) as HTMLElement;
+            if(!schema) return;
+            loop.innerHTML = schema.innerHTML
+            return loop;
+        }
+    }
+
+    /**
+     * Exports from other modules
+     */
+
+    public getComponent(activeScript:Element) {
+        return this.componentFunctions.getComponent(activeScript);
+    }
 }
