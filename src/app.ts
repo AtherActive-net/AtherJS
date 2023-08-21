@@ -38,7 +38,7 @@ export class AtherJS {
     private activeScriptNameStates: string[] = [];
     private urlHistory: string[] = [];
     private templateCache = new Map<string, string>();
-    private componentFunctions = new ComponentFunctions();
+    public componentFunctions = new ComponentFunctions();
 
     /**
      * AtherJS Constructor
@@ -741,7 +741,6 @@ export class AtherJS {
         }
 
         const child = loop.firstElementChild;
-        console.log(atherVariable.length)
         for(let i = 0; i < atherVariable.length; i++) {
             const newChild = loop.appendChild(child.cloneNode(true)) as HTMLElement;
             const values = newChild.querySelectorAll(`[${attributes.get('each')}]`);
@@ -771,6 +770,10 @@ export class AtherJS {
             element.setAttribute('at-foreach-uuid', uuid);
 
             return component?.getStore()?.get(variable.substring(2));
+        }
+
+        if(variable.startsWith("@.")) {
+            this.store.get(variable.substring(2));
         }
         return this.page.get(variable);
     }

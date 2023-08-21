@@ -1,3 +1,4 @@
+import type { AtherJS } from 'app.js';
 import { log,attributes } from './utils.js';
 
 /**
@@ -22,6 +23,19 @@ export class StateObject {
      */
     public findElements() {
         const attribute = attributes.get(this.prefix+'state');
+        
+        // if it wasnt found, we can assume it is a component
+        if(!attribute) {
+            const component = (window['ather'] as AtherJS).componentFunctions.getComponentByUUID(this.prefix);
+            if(!component) {
+                log(`Could not find component with UUID '${this.prefix}'.`, 'warn');
+                return;
+            }
+            
+            this.referencedElements = Array.from(component.element.querySelectorAll(`[at-var^="&.${this.name}"]`));
+            return;
+        }
+
         this.referencedElements = Array.from(document.querySelectorAll(`[${attribute}^="${this.name}"]`));
     }
 
@@ -32,7 +46,6 @@ export class StateObject {
         // send out a custom event
         const event = new CustomEvent('atherjs:state-update', { detail: { name: this.name, value: this.value, prefix: this.prefix } });
         document.dispatchEvent(event);
-
         this.referencedElements.forEach((el) => {
             if(el.getAttribute(attributes.get(this.prefix+'state-value'))) {
                 const key = el.getAttribute(attributes.get(this.prefix+'state'));
@@ -48,7 +61,7 @@ export class StateObject {
                     log(`Value '${value}' does not exist on state '${key}'.`, 'warn');
                 }
             } else {
-                const key = el.getAttribute(attributes.get(this.prefix+'state'));
+                let key = this.removePefixFromKey(el.getAttribute("at-var"));
                 
                 // Attempt to get the proper value. This is needed for nested objects.
                 // If the key is not nested, it will just return it.
@@ -83,5 +96,11 @@ export class StateObject {
             value = value[splitKey];
         });
         return value;
+    }
+
+    private removePefixFromKey(key:string) {
+        if(key.startsWith("&.")) return key.replace("&.", "");
+        if(key.startsWith("@")) return key.replace("@", "");
+        return key;
     }
 }
